@@ -1,0 +1,2638 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GEO-TOY ISLANDS | 構造微縮學園 — 3D 地理互動模擬城市</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Fredoka:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --toy-cream: #FFFDF7;
+            --toy-amber: #FFB703;
+            --toy-orange: #FB8500;
+            --toy-blue: #219EBC;
+            --toy-navy: #023047;
+        }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #E2F1F8;
+            overflow: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-brand {
+            font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+        }
+        /* Custom Toy Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+            border: 2px solid #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+        /* Toy Tactile Button Effect */
+        .toy-btn {
+            box-shadow: 0 4px 0 #023047;
+            transition: all 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .toy-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #023047;
+        }
+        .toy-card {
+            border: 3px solid #023047;
+            box-shadow: 0 6px 0 rgba(2, 48, 71, 0.18);
+        }
+        .toy-badge {
+            border: 2px solid #023047;
+            box-shadow: 0 2px 0 #023047;
+        }
+        /* Floating 3D HTML Labels */
+        .island-label {
+            pointer-events: auto;
+            cursor: pointer;
+            transform: translate(-50%, -100%);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .island-label:hover {
+            transform: translate(-50%, -112%) scale(1.08);
+            z-index: 40;
+        }
+        /* Accordion Smooth Transition */
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease-in-out, opacity 0.25s ease-in-out;
+            opacity: 0;
+        }
+        .accordion-content.open {
+            max-height: 2200px;
+            opacity: 1;
+        }
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-float {
+            animation: floatSlow 3.2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden flex flex-col">
+
+    <!-- 3D Canvas Viewport -->
+    <div id="canvas-container" class="relative w-full h-full flex-grow overflow-hidden">
+        <canvas id="three-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+        <!-- Dynamic 3D Island Floating Pins -->
+        <div id="labels-container" class="absolute inset-0 pointer-events-none overflow-hidden z-10"></div>
+    </div>
+
+    <!-- Top Brand & Progress Navigation Bar -->
+    <header class="fixed top-0 left-0 right-0 z-30 p-2.5 sm:p-4 pointer-events-none flex flex-col gap-2">
+        <div class="max-w-7xl mx-auto w-full flex items-center justify-between gap-2">
+            <!-- Brand Identity -->
+            <div class="pointer-events-auto bg-[#FFFDF7] toy-card rounded-2xl px-3.5 py-2 flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-amber-400 border-2 border-[#023047] flex items-center justify-center text-[#023047] shadow-inner">
+                    <i class="ph-fill ph-planet text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-brand font-black text-base sm:text-lg tracking-tight text-[#023047]">GEO-TOY ISLANDS</span>
+                        <span class="hidden md:inline-block bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#023047]">DSE 地理互動學園</span>
+                    </div>
+                    <p class="text-[11px] sm:text-xs text-slate-600 font-medium">機會與風險：微縮構造模擬城市</p>
+                </div>
+            </div>
+
+            <!-- Right Controls & Stamp Progress -->
+            <div class="pointer-events-auto flex items-center gap-2">
+                <!-- Exploration Progress Pill -->
+                <div class="bg-[#FFFDF7] toy-card rounded-2xl px-3 py-1.5 flex items-center gap-2">
+                    <div class="flex items-center gap-1 text-amber-500">
+                        <i class="ph-fill ph-medal text-xl"></i>
+                        <span class="text-xs font-bold text-[#023047] hidden sm:inline">登島進度</span>
+                    </div>
+                    <div class="bg-amber-100 border-2 border-[#023047] px-2.5 py-0.5 rounded-full font-brand font-bold text-xs sm:text-sm text-[#023047]">
+                        <span id="explored-count">1</span> / 7 島
+                    </div>
+                </div>
+
+                <!-- Camera Reset Button -->
+                <button onclick="resetCameraView()" title="俯瞰全島" class="bg-sky-400 hover:bg-sky-300 text-[#023047] toy-btn border-2 border-[#023047] rounded-2xl p-2.5 flex items-center gap-1.5 font-bold text-xs sm:text-sm">
+                    <i class="ph-bold ph-compass text-lg"></i>
+                    <span class="hidden sm:inline">全景視角</span>
+                </button>
+
+                <!-- Quick Guide Button -->
+                <button onclick="toggleHelpModal(true)" title="操作指南" class="bg-amber-400 hover:bg-amber-300 text-[#023047] toy-btn border-2 border-[#023047] rounded-2xl p-2.5 flex items-center justify-center">
+                    <i class="ph-bold ph-question text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Island Switcher Bar (Scrollable on Mobile, Centered on Desktop) -->
+        <div class="max-w-7xl mx-auto w-full pointer-events-auto overflow-x-auto no-scrollbar py-1">
+            <div id="island-nav-pills" class="flex items-center gap-1.5 sm:gap-2 w-max sm:w-auto sm:justify-center px-1">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Bottom-Left 3D Controls Hint (Hidden on small mobile when drawer is open) -->
+    <div class="fixed bottom-20 lg:bottom-5 left-4 z-20 pointer-events-none hidden sm:flex items-center gap-2 bg-[#FFFDF7]/90 backdrop-blur border-2 border-[#023047] rounded-xl px-3 py-1.5 text-xs font-bold text-[#023047] shadow">
+        <i class="ph-bold ph-hand-swipe-right text-base text-orange-500"></i>
+        <span>拖曳旋轉視角 • 滾輪/雙指縮放 • 點擊小島登陸學習</span>
+    </div>
+
+    <!-- Responsive Learning Panel (Right Dock on Desktop / Collapsible Bottom Sheet on Mobile & Tablet) -->
+    <aside id="learning-drawer" class="fixed z-30 transition-all duration-300 ease-in-out
+        bottom-0 left-0 right-0 lg:top-28 lg:bottom-5 lg:left-auto lg:right-5 lg:w-[500px] xl:w-[560px]
+        bg-[#FFFDF7] toy-card rounded-t-3xl lg:rounded-3xl flex flex-col overflow-hidden max-h-[86vh] lg:max-h-full">
+
+        <!-- Mobile / Tablet Drag Handle & Collapse Toggle Bar -->
+        <div class="bg-amber-400 border-b-3 border-[#023047] px-4 py-2.5 flex items-center justify-between cursor-pointer lg:cursor-default select-none" onclick="handleHeaderBarClick(event)">
+            <div class="flex items-center gap-2.5 overflow-hidden">
+                <span id="drawer-island-badge" class="bg-[#023047] text-amber-300 font-brand font-bold text-xs px-2.5 py-1 rounded-lg shrink-0">ISLAND 01</span>
+                <h2 id="drawer-island-title" class="font-black text-base sm:text-lg text-[#023047] truncate">板塊構造理論島</h2>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <!-- Mobile/Tablet Collapse Button -->
+                <button id="drawer-toggle-btn" onclick="toggleDrawerCollapse(event)" class="lg:hidden bg-[#FFFDF7] hover:bg-amber-50 text-[#023047] border-2 border-[#023047] rounded-xl px-2.5 py-1 text-xs font-bold flex items-center gap-1 shadow-sm">
+                    <span id="drawer-toggle-text">收起面板</span>
+                    <i id="drawer-toggle-icon" class="ph-bold ph-caret-down text-sm"></i>
+                </button>
+                <!-- Desktop Minimize Button -->
+                <button onclick="toggleDrawerCollapse(event)" class="hidden lg:flex bg-[#FFFDF7] hover:bg-amber-50 text-[#023047] border-2 border-[#023047] rounded-xl px-2.5 py-1 text-xs font-bold items-center gap-1">
+                    <span id="desktop-toggle-text">收起</span>
+                    <i id="desktop-toggle-icon" class="ph-bold ph-arrows-in-simple text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Drawer Body Content -->
+        <div id="drawer-body" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            <!-- Dynamic Island Content Injected Here -->
+        </div>
+
+        <!-- Drawer Footer Navigation -->
+        <div id="drawer-footer" class="bg-slate-100 border-t-2 border-[#023047] px-4 py-2.5 flex items-center justify-between text-xs font-bold text-[#023047]">
+            <button onclick="navigateIsland(-1)" class="bg-white hover:bg-amber-100 border-2 border-[#023047] toy-btn rounded-xl px-3 py-1.5 flex items-center gap-1">
+                <i class="ph-bold ph-arrow-left"></i> 上一個小島
+            </button>
+            <span id="drawer-footer-status" class="text-slate-600 hidden sm:inline">點擊各專題摺疊卡展開詳情</span>
+            <button onclick="navigateIsland(1)" class="bg-amber-400 hover:bg-amber-300 border-2 border-[#023047] toy-btn rounded-xl px-3 py-1.5 flex items-center gap-1">
+                下一個小島 <i class="ph-bold ph-arrow-right"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Welcome / Guide Modal -->
+    <div id="help-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-[#FFFDF7] toy-card rounded-3xl max-w-lg w-full overflow-hidden animate-bounce-once">
+            <div class="bg-amber-400 border-b-3 border-[#023047] px-5 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-compass-tool text-2xl text-[#023047]"></i>
+                    <h3 class="font-black text-lg text-[#023047]">歡迎登陸「構造微縮學園」！</h3>
+                </div>
+                <button onclick="toggleHelpModal(false)" class="w-8 h-8 rounded-xl bg-white border-2 border-[#023047] flex items-center justify-center text-[#023047] hover:bg-rose-100">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 text-sm text-slate-700 leading-relaxed">
+                <p class="font-medium text-[#023047]">這是一座由 <strong>7 個六角形微縮模型小島</strong> 組成的 3D 互動地理學習城市，涵蓋《機會與風險——居住在災害頻生地區是否明智之舉？》的核心教材與最新全球案例：</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div class="bg-amber-50 border-2 border-[#023047] rounded-xl p-2.5 flex items-start gap-2">
+                        <i class="ph-fill ph-cube-focus text-xl text-amber-600 shrink-0 mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-[#023047]">3D 自由探索</div>
+                            <p class="text-slate-600">單指/滑鼠拖曳旋轉島嶼，滾輪或雙指縮放，點擊任意六角島即可登島。</p>
+                        </div>
+                    </div>
+                    <div class="bg-sky-50 border-2 border-[#023047] rounded-xl p-2.5 flex items-start gap-2">
+                        <i class="ph-fill ph-device-mobile text-xl text-sky-600 shrink-0 mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-[#023047]">跨裝置自動適應</div>
+                            <p class="text-slate-600">手機版可隨時點擊「收起面板」觀賞 3D 模型，內容採用摺疊卡設計，按需展開。</p>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-50 border-2 border-[#023047] rounded-xl p-2.5 flex items-start gap-2">
+                        <i class="ph-fill ph-sliders-horizontal text-xl text-emerald-600 shrink-0 mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-[#023047]">互動模擬實驗</div>
+                            <p class="text-slate-600">在邊界地貌島、海嘯島及災害評估島提供即時動態圖表與互動實驗器。</p>
+                        </div>
+                    </div>
+                    <div class="bg-rose-50 border-2 border-[#023047] rounded-xl p-2.5 flex items-start gap-2">
+                        <i class="ph-fill ph-chats-circle text-xl text-rose-600 shrink-0 mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-[#023047]">說服居民任務</div>
+                            <p class="text-slate-600">在第 6 島分析欠發達國家脆弱性，並在第 7 島挑戰說服災區居民安全撤離！</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end">
+                    <button onclick="toggleHelpModal(false)" class="bg-amber-400 hover:bg-amber-300 text-[#023047] font-black px-6 py-2.5 rounded-2xl border-2 border-[#023047] toy-btn">
+                        開始登島探索！
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * 1. COMPREHENSIVE GEOGRAPHY CURRICULUM & INTERACTIVE DATA (7 ISLANDS)
+         ********************************************************************/
+        const ISLANDS_DATA = [
+            {
+                id: 1,
+                code: "ISLAND 01",
+                shortName: "1. 板塊構造理論",
+                title: "板塊構造理論與全球板塊分佈",
+                subtitle: "探索地球內部三層結構、岩石圈與軟流圈、驅動板塊移動的力量",
+                themeColor: "#10B981",
+                badgeBg: "bg-emerald-500",
+                icon: "ph-globe-hemisphere-east",
+                pos: { x: 0, z: 0 }, // Center Island
+                summary: "地球並非穩固不變！最外層的固態「岩石圈」斷裂成多塊大小不一的構造板塊，漂浮在熾熱黏稠的「軟流圈」之上，每年以數厘米的速度緩慢移動。",
+                keyMetrics: [
+                    { label: "地殼平均厚度", val: "6–70 km", note: "大洋地殼薄而重；大陸地殼厚而輕" },
+                    { label: "地幔厚度", val: "約 2,900 km", note: "包含固態最上層、黏稠軟流圈及下地幔" },
+                    { label: "地核溫度", val: "高達 5,500°C", note: "外地核呈液態，內地核因高壓呈固態" }
+                ],
+                interactiveType: "earth-layers",
+                accordions: [
+                    {
+                        title: "🌍 地球內部圈層與「大洋 vs 大陸地殼」對比",
+                        openDefault: true,
+                        content: `
+                            <p class="text-xs sm:text-sm text-slate-700 mb-3">地球按化學成分與密度由外而內分為<strong>地殼、地幔、地核</strong>。地理學上更常根據物質狀態區分出<strong>岩石圈（Lithosphere）</strong>與<strong>軟流圈（Asthenosphere）</strong>：</p>
+                            <div class="overflow-x-auto rounded-xl border-2 border-[#023047] mb-3">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="bg-[#023047] text-amber-300 font-bold">
+                                        <tr>
+                                            <th class="p-2">比較項目</th>
+                                            <th class="p-2">大陸地殼 (Continental)</th>
+                                            <th class="p-2">大洋地殼 (Oceanic)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200 bg-white">
+                                        <tr>
+                                            <td class="p-2 font-bold">厚度</td>
+                                            <td class="p-2">較厚（約 25–70 公里，高山下更厚）</td>
+                                            <td class="p-2">較薄（僅約 6–8 公里）</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-2 font-bold">平均密度</td>
+                                            <td class="p-2 text-emerald-700 font-bold">較低（約 2.7 g/cm³，輕）</td>
+                                            <td class="p-2 text-rose-700 font-bold">較高（約 3.0 g/cm³，重，易俯衝）</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-2 font-bold">主要礦物</td>
+                                            <td class="p-2">二氧化硅、鋁、鉀、鈉（硅鋁質）</td>
+                                            <td class="p-2">二氧化硅、鐵、鎂（硅鎂質）</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-2 font-bold">岩石年齡</td>
+                                            <td class="p-2">較古老（可達數十億年）</td>
+                                            <td class="p-2">較年輕（一般少於 2 億年）</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="bg-amber-50 border-l-4 border-amber-500 p-2.5 rounded-r-xl text-xs text-slate-700">
+                                <strong>💡 關鍵概念：</strong> <strong>岩石圈</strong> = 整個地殼 + 地幔最上層（厚約 100–200 公里，呈剛性固態）。其下方的<strong>軟流圈</strong>（深約 100–350 公里）處於高溫高壓，呈固態但具塑性黏稠狀（如軟牛油），能緩慢流動承載板塊。
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🗺️ 全球主要及次要板塊分佈與香港位置",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2.5 text-xs sm:text-sm text-slate-700">
+                                <p>全球岩石圈由 <strong>7 大主要板塊</strong> 及多個重要次要板塊拼合而成。大多數板塊同時承載大陸地殼及大洋地殼（如歐亞板塊），少數幾乎只承載大洋地殼（如太平洋板塊、納斯卡板塊）。</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div class="bg-white p-2.5 rounded-xl border-2 border-slate-800">
+                                        <div class="font-bold text-[#023047] mb-1">🌟 主要板塊例子</div>
+                                        <p class="text-xs text-slate-600">歐亞板塊、太平洋板塊、印度—澳洲板塊、非洲板塊、北美洲板塊、南美洲板塊、南極洲板塊。</p>
+                                    </div>
+                                    <div class="bg-white p-2.5 rounded-xl border-2 border-slate-800">
+                                        <div class="font-bold text-[#023047] mb-1">🔍 必考次要板塊</div>
+                                        <p class="text-xs text-slate-600"><strong>菲律賓板塊</strong>（影響台灣及日本）、<strong>納斯卡板塊</strong>（與南美碰撞）、<strong>科科斯板塊</strong>（影響墨西哥）、<strong>胡安德富卡板塊</strong>、<strong>阿拉伯板塊</strong>。</p>
+                                    </div>
+                                </div>
+                                <div class="bg-sky-50 border-2 border-sky-700 p-2.5 rounded-xl text-xs">
+                                    <strong>📍 香港為甚麼少有強烈地震？</strong><br>
+                                    香港位於<strong>歐亞板塊內部</strong>，距離最近的板塊邊界（環太平洋地震帶的台灣及菲律賓板塊邊界）超過 <strong>600 公里</strong>，因此地殼相對穩定，極少發生毀滅性大地震。
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "⚙️ 板塊移動三大驅動力：地幔對流、脊推與板拉",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <div class="p-2.5 bg-orange-50 border-2 border-orange-600 rounded-xl">
+                                    <div class="font-bold text-orange-900">1. 地幔對流 (Mantle Convection) —— 觸發因素</div>
+                                    <p class="mt-1">地核極高溫加上放射性元素衰變釋放熱能，加熱下地幔岩石使其膨脹、密度降低並上湧形成<strong>地幔熱柱（Mantle Plume）</strong>；冷卻收縮後高密度岩石圈下沉，構成熱力循環。</p>
+                                </div>
+                                <div class="p-2.5 bg-emerald-50 border-2 border-emerald-600 rounded-xl">
+                                    <div class="font-bold text-emerald-900">2. 脊推 (Ridge Push) —— 張裂邊界推力</div>
+                                    <p class="mt-1">岩漿在大洋中脊上湧形成隆起的新地殼，冷卻變重後受重力影響沿山脊兩側斜坡下滑，將舊板塊向外推開（約佔驅動力 5%–10%）。</p>
+                                </div>
+                                <div class="p-2.5 bg-indigo-50 border-2 border-indigo-600 rounded-xl">
+                                    <div class="font-bold text-indigo-900">3. 板拉 (Slab Pull) —— 最主要驅動力！</div>
+                                    <p class="mt-1">大洋岩石圈移離海脊後因底侵作用變得又冷又厚又重；在聚合邊界俯衝下沉入軟流圈時，產生強大重力吸力拖曳整塊板塊前進。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🔄 三大板塊邊界類型總覽",
+                        openDefault: false,
+                        content: `
+                            <div class="grid grid-cols-1 gap-2 text-xs">
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl flex items-start gap-2.5">
+                                    <span class="px-2 py-1 rounded bg-emerald-500 text-white font-bold shrink-0">張裂型</span>
+                                    <div>
+                                        <div class="font-bold text-[#023047]">建設性板塊邊界 (Divergent / Constructive)</div>
+                                        <p class="text-slate-600">兩塊板塊互相背離漂離（← →），承受<strong>張力</strong>，岩漿上湧冷卻形成新的大洋地殼（海脊附近的岩石年齡最新）。</p>
+                                    </div>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl flex items-start gap-2.5">
+                                    <span class="px-2 py-1 rounded bg-rose-500 text-white font-bold shrink-0">聚合型</span>
+                                    <div>
+                                        <div class="font-bold text-[#023047]">破壞性板塊邊界 (Convergent / Destructive)</div>
+                                        <p class="text-slate-600">兩塊板塊相向碰撞（→ ←），承受<strong>擠壓力</strong>，高密度板塊俯衝進入軟流圈熔融消亡。</p>
+                                    </div>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl flex items-start gap-2.5">
+                                    <span class="px-2 py-1 rounded bg-amber-500 text-white font-bold shrink-0">轉換型</span>
+                                    <div>
+                                        <div class="font-bold text-[#023047]">穩定性板塊邊界 (Transform / Conservative)</div>
+                                        <p class="text-slate-600">兩塊板塊水平相互擦過（⇅），承受<strong>剪切力</strong>，既不形成新地殼，也沒有地殼消亡。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 2,
+                code: "ISLAND 02",
+                shortName: "2. 邊界與構造地貌",
+                title: "板塊邊界及構造地貌的形成過程",
+                subtitle: "內營力與內部作用（褶曲、斷層、火山）、不同板塊邊界塑造的地形",
+                themeColor: "#F97316",
+                badgeBg: "bg-orange-500",
+                icon: "ph-mountains",
+                pos: { x: 0, z: -10.8 }, // North
+                summary: "板塊運動產生張力、擠壓力與剪切力三種內營力，引發褶曲、斷層與火山作用，在大洋與大陸上雕琢出大洋中脊、裂谷、海溝、火山島弧與宏偉的褶曲山脈。",
+                keyMetrics: [
+                    { label: "世界最深海溝", val: "馬里亞納海溝", note: "挑戰者深淵低於海平面 10,925 米" },
+                    { label: "最高新褶曲山", val: "喜馬拉雅山脈", note: "珠穆朗瑪峯海拔 8,848 米（陸—陸碰撞）" },
+                    { label: "香港地質實證", val: "大埔馬屎洲", note: "保存流紋岩岩脈、褶曲及斷層三大內部作用" }
+                ],
+                interactiveType: "boundary-simulator",
+                accordions: [
+                    {
+                        title: "🔨 三大內部作用：褶曲、斷層與侵入/噴出火山作用",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <div class="bg-white border-2 border-[#023047] rounded-xl p-2.5">
+                                    <div class="font-bold text-[#023047] mb-1">1. 褶曲作用 (Folding) —— 擠壓力下的塑性變形</div>
+                                    <p>深藏地底的高溫柔軟岩層受<strong>擠壓力</strong>彎曲而不斷裂：向上拱起為<strong>背斜 (Anticline)</strong>，向下凹陷為<strong>向斜 (Syncline)</strong>。大規模褶曲形成連綿的<strong>新褶曲山帶</strong>（如阿爾卑斯—喜馬拉雅山帶、落基山脈、安第斯山脈）。</p>
+                                </div>
+                                <div class="bg-white border-2 border-[#023047] rounded-xl p-2.5">
+                                    <div class="font-bold text-[#023047] mb-1">2. 斷層作用 (Faulting) —— 岩石超越抗力斷裂位移</div>
+                                    <ul class="list-disc pl-4 space-y-1 mt-1">
+                                        <li><strong>正斷層 (Normal Fault)：</strong>受<strong>張力</strong>拉扯，上盤岩塊沿斷層面下滑。</li>
+                                        <li><strong>逆斷層 (Reverse Fault)：</strong>受<strong>擠壓力</strong>推擠，上盤岩塊沿斷層面抬升。</li>
+                                        <li><strong>走滑斷層 (Strike-slip Fault)：</strong>受<strong>剪切力</strong>影響，岩塊水平錯動。</li>
+                                        <li><strong>斷塊山（地壘 Horst）與裂谷（地塹 Graben）：</strong>如美國西部謝爾克里克嶺與蛇嶺夾着的「春谷」裂谷。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white border-2 border-[#023047] rounded-xl p-2.5">
+                                    <div class="font-bold text-[#023047] mb-1">3. 火山作用 (Volcanism) —— 侵入 vs 噴出</div>
+                                    <p><strong>噴出作用：</strong>中心噴道噴發形成圓錐形<strong>火山、火山口湖、破火山口</strong>（岩漿室清空塌陷，如印尼多峇湖、香港糧船灣超級火山破火山口）；裂縫噴發形成<strong>熔岩高原</strong>（如印度德干高原）。<br>
+                                    <strong>侵入作用：</strong>岩漿在地殼內冷卻形成巨大圓丘狀<strong>岩基 (Batholith)</strong>、平行層面的<strong>岩牀 (Sill)</strong>、拱起岩層的<strong>岩蓋 (Laccolith)</strong> 及垂直切穿層面的<strong>岩脈 (Dyke)</strong>。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🌊 張裂型邊界地貌：海底（大洋中脊） vs 陸地（東非大裂谷）",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <div class="p-2.5 bg-sky-50 border-2 border-sky-800 rounded-xl">
+                                    <div class="font-bold text-sky-900">A. 海底張裂（洋—洋背離）：例如大西洋中脊、東太平洋中脊</div>
+                                    <ol class="list-decimal pl-4 mt-1 space-y-1">
+                                        <li>板塊背離產生裂縫，軟流圈減壓部分熔融，熾熱岩漿上湧冷卻成新地殼，因熱能浮力隆起成<strong>大洋中脊</strong>。</li>
+                                        <li>持續張力在大洋中脊頂部形成正斷層，中間岩塊下沉成海底<strong>裂谷</strong>；各斷裂海脊段由<strong>轉換斷層</strong>連接。</li>
+                                        <li>岩漿沿裂縫噴發成<strong>海底火山</strong>，露出海面成為<strong>火山島</strong>（如冰島、復活節島）。移離海脊後失去岩漿供應變為死火山。</li>
+                                    </ol>
+                                </div>
+                                <div class="p-2.5 bg-amber-50 border-2 border-amber-800 rounded-xl">
+                                    <div class="font-bold text-amber-900">B. 陸地張裂（陸—陸背離）：例如東非大裂谷</div>
+                                    <p class="mt-1">非洲板塊分裂為<strong>努比亞板塊</strong>與<strong>索馬里板塊</strong>。大陸岩石圈受張力拉薄斷裂，形成一系列正斷層，中間岩塊下沉形成<strong>東非大裂谷</strong>（積水成維多利亞湖等裂谷湖），伴隨活躍火山。未來若紅海海水湧入，將形成新海洋。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "💥 聚合型邊界三種碰撞地貌（洋陸、洋洋、陸陸）及轉換邊界",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded">1. 洋—陸碰撞</span> <strong>納斯卡板塊 + 南美洲板塊</strong>
+                                    <p class="mt-1">高密度大洋板塊俯衝形成<strong>秘魯—智利海溝</strong>；沿海沉積岩受擠壓隆起並配合岩基侵入增厚，形成<strong>安第斯褶曲山脈</strong>；俯衝板塊釋出水分降低軟流圈熔點，岩漿沿裂縫噴出成<strong>欽博拉索火山</strong>。</p>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">2. 洋—洋碰撞</span> <strong>太平洋/印度澳洲板塊 + 歐亞/菲律賓板塊</strong>
+                                    <p class="mt-1">較重的大洋板塊俯衝形成<strong>海溝</strong>（如馬里亞納海溝、爪哇海溝、日本海溝）；岩漿上湧形成平行海溝的一連串海底火山，露出海面構成<strong>火山島弧 (Volcanic Island Arc)</strong>，如日本羣島、菲律賓羣島、印尼巽他羣島。</p>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">3. 陸—陸碰撞</span> <strong>印度—澳洲板塊 + 歐亞板塊</strong>
+                                    <p class="mt-1">早期大洋地殼完全俯衝後，印度次大陸與亞洲大陸正面碰撞。因兩者皆厚而輕，<strong>沒有一方俯衝</strong>，地殼劇烈壓皺增厚（厚達 75 km），把古海洋沉積岩抬升成<strong>喜馬拉雅山脈</strong>及青藏高原。因俯衝結束且地殼極厚，山上<strong>沒有活火山</strong>。</p>
+                                </div>
+                                <div class="p-2.5 bg-slate-100 border-2 border-[#023047] rounded-xl">
+                                    <span class="bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded">4. 板塊轉換邊界</span> <strong>北美洲板塊 + 太平洋板塊</strong>
+                                    <p class="mt-1">太平洋板塊向西北擦過北美洲板塊，剪切力形成著名的<strong>聖安德烈亞斯斷層 (San Andreas Fault)</strong>，無火山及褶曲山，但淺層地震極頻密。</p>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 3,
+                code: "ISLAND 03",
+                shortName: "3. 地震專題島",
+                title: "地震：形成、影響、近年大型事件與減災應變",
+                subtitle: "震源與震央、直接與間接破壞、3 個近年重大地震案例及抗震科技",
+                themeColor: "#EF4444",
+                badgeBg: "bg-red-500",
+                icon: "ph-activity",
+                pos: { x: 9.35, z: -5.4 }, // North-East
+                summary: "當板塊移動令岩層積存的應力超過岩石抗力，岩石便沿斷層突然斷裂位移並釋放地震波。淺層地震及人口密集區的地震往往帶來毀滅性傷亡。",
+                keyMetrics: [
+                    { label: "主要分佈帶", val: "環太平洋帶 (80%)", note: "其次為阿爾卑斯—喜馬拉雅山帶" },
+                    { label: "震源深度分級", val: "淺源 < 70 km", note: "淺源地震傳播距離短，地面破壞力最強" },
+                    { label: "黃金應變口訣", val: "趴下、掩護、穩住", note: "Drop, Cover, and Hold On" }
+                ],
+                interactiveType: "earthquake-cases",
+                accordions: [
+                    {
+                        title: "⚡ 地震的形成過程、震源與震央、量度指標",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <p><strong>形成機制：</strong>板塊相撞、背離或擦過時產生巨大摩擦力與應力，能量在岩層中積聚。當壓力超過岩石內部抗力時，岩石突然沿斷層斷裂並出現相對位移，積存的能量以<strong>地震波（Seismic Waves）</strong>向四方八面擴散。</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="bg-rose-50 border-2 border-rose-700 p-2 rounded-xl">
+                                        <div class="font-bold text-rose-900">🎯 震源 (Focus) vs 震央 (Epicentre)</div>
+                                        <p class="mt-1"><strong>震源</strong>是地底岩石斷裂釋放能量的起點；震源正上方的地表位置稱為<strong>震央</strong>，因距離震源最近，震動最劇烈。</p>
+                                    </div>
+                                    <div class="bg-amber-50 border-2 border-amber-700 p-2 rounded-xl">
+                                        <div class="font-bold text-amber-900">📏 等級 vs 強度</div>
+                                        <p class="mt-1"><strong>黎克特震級/矩震級 (Magnitude)</strong> 量度釋放的能量（由地震儀記錄）；<strong>修訂麥加利震級 (Intensity, I–XII度)</strong> 按地表實際破壞程度評估。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🏚️ 地震的直接影響與間接（次生）影響",
+                        openDefault: false,
+                        content: `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                <div class="bg-white border-2 border-rose-600 rounded-xl p-2.5">
+                                    <div class="font-bold text-rose-700 mb-1 flex items-center gap-1"><i class="ph-fill ph-warning-octagon"></i> 直接影響（土地劇烈搖晃即時造成）</div>
+                                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                                        <li>房屋、高架橋樑、道路、水壩等建築物即時倒塌，壓傷或活埋居民。</li>
+                                        <li>地底電纜、輸氣管、自來水管斷裂受損。</li>
+                                        <li>民眾受驚引發社會恐慌。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white border-2 border-orange-600 rounded-xl p-2.5">
+                                    <div class="font-bold text-orange-700 mb-1 flex items-center gap-1"><i class="ph-fill ph-fire"></i> 間接影響（由直接破壞引發的後續災難）</div>
+                                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                                        <li>輸氣管與電線短路引發<strong>大火</strong>；水壩崩塌或<strong>堰塞湖</strong>決堤引發<strong>廣泛氾濫</strong>。</li>
+                                        <li>在陡峭山區觸發<strong>山泥傾瀉、雪崩</strong>；海底地震觸發<strong>海嘯</strong>。</li>
+                                        <li>通訊與交通中斷阻礙救援；水源污染導致<strong>疫症蔓延</strong>；商業停頓與重建成本沉重。</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "📰 3 個近年大型地震事件深度剖析（2023–2025）",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2.5 text-xs">
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>① 2023年2月 土耳其—敘利亞大地震 (Mw 7.8 & 7.5)</span>
+                                        <span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">死亡逾 59,000 人</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>阿拉伯板塊向北擠壓安納托利亞板塊（東安納托利亞走滑斷層），震源僅深 17.9 公里。凌晨4時發生，數萬幢未符抗震標準的混凝土樓宇呈「煎餅式倒塌」，加上嚴冬寒潮與敘利亞內戰阻礙救援，死傷極慘重。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>② 2024年1月 日本石川縣能登半島地震 (Mw 7.5)</span>
+                                        <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">地面隆起達 4 米</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>位於歐亞板塊與北美/鄂霍次克板塊邊界逆斷層帶（淺源 16 公里）。引發輪島市大規模火災、山泥傾瀉切斷半島唯一幹道，並觸發高達 5 米的海嘯，反映老舊木造房屋及高齡化社區的脆弱性。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>③ 2024年4月 台灣花蓮地震 (Mw 7.4) / 2025年3月 緬甸實皆地震 (Mw 7.7)</span>
+                                        <span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">預警與建築對比</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>2024 花蓮地震因菲律賓海板塊俯衝歐亞板塊引發，雖造成太魯閣嚴重落石，但台灣憑藉國家級警報及嚴格抗震建築法規，死亡人數控制在 18 人；相反 2025 年緬甸實皆走滑斷層 7.7 級淺源地震，因缺乏抗震基建造成逾 3,000 人傷亡。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🛡️ 面對地震的個人應變方法與減少地震損失的措施",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <div class="bg-emerald-50 border-2 border-emerald-700 p-2.5 rounded-xl">
+                                    <div class="font-bold text-emerald-900 mb-1">🏃 面對地震的個人即時應變方法</div>
+                                    <ul class="list-disc pl-4 space-y-1">
+                                        <li><strong>室內：</strong>立即執行<strong>「趴下 (Drop)、掩護 (Cover)、穩住 (Hold on)」</strong>，躲在堅固桌下，用枕頭或防災兜帽保護頭頸，遠離玻璃窗、吊燈及高大書櫃；<strong>切勿乘搭升降機</strong>。</li>
+                                        <li><strong>室外：</strong>遠離建築物外牆、招牌、電線桿及陡坡，前往公園等空曠避難場所。</li>
+                                        <li><strong>震後：</strong>關閉煤氣及電源總掣以防火災，穿好鞋子防碎玻璃，攜帶緊急逃生包按疏散路牌撤離。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white border-2 border-[#023047] p-2.5 rounded-xl">
+                                    <div class="font-bold text-[#023047] mb-1">🏗️ 政府與社會減少地震損失的五大措施</div>
+                                    <ol class="list-decimal pl-4 space-y-1">
+                                        <li><strong>設立監測、預測和預警系統：</strong>利用地震儀、GPS 衛星、應變計及地殼變形精密測量儀監測微震；如日本緊急地震速報系統可自動令新幹線高速列車緊急煞車，及透過手機 App（如墨西哥 SASMEX）發佈警報。</li>
+                                        <li><strong>採用具抗震能力的建築結構：</strong>地基深入基岩並加裝<strong>隔震彈簧/橡膠墊</strong>、強化鋼筋混凝土框架、金字塔式或階梯式不對稱防共振結構（如杜拜哈利法塔）、自動切斷供氣閥及防火建材。</li>
+                                        <li><strong>土地利用規劃：</strong>編製地震風險地圖，限制斷層帶發展密度及樓宇高度；禁止在高危區興建核電廠及油庫；預留大型公園及學校作臨時庇護中心，規劃清晰疏散路線。</li>
+                                        <li><strong>教育與定期地震演習：</strong>學校每月舉行防災演習（如日本學童配戴防火頭巾），推廣三天糧水儲備與家具固定。</li>
+                                        <li><strong>救援系統、災難援助與地震保險：</strong>配備生命探測器與搜救犬的專業救援隊，政府設立應急基金及資助地震保險助災後重建。</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 4,
+                code: "ISLAND 04",
+                shortName: "4. 火山爆發島",
+                title: "火山爆發：形成、影響、近年大型事件與減災應變",
+                subtitle: "太平洋火環與熱點火山、熔岩與火山灰破壞、3 個近年火山爆發案例",
+                themeColor: "#D97706",
+                badgeBg: "bg-amber-600",
+                icon: "ph-fire",
+                pos: { x: 9.35, z: 5.4 }, // South-East
+                summary: "超過 90% 的活火山分佈於聚合型（太平洋火環）與張裂型板塊邊界，另有部分位於地幔熱柱上湧的「熱點」（如夏威夷、黃石）。黏稠度與二氧化硅含量決定了爆發的猛烈程度。",
+                keyMetrics: [
+                    { label: "最活躍火山帶", val: "太平洋火環", note: "集中全球約 80% 俯衝帶猛烈活火山" },
+                    { label: "主要噴發物質", val: "熔岩、碎屑、氣體", note: "火山灰混雨水形成致命火山泥流 (Lahar)" },
+                    { label: "減災工程代表", val: "熔岩分流渠道", note: "如意大利埃特納火山及冰島防護屏障" }
+                ],
+                interactiveType: "volcano-cases",
+                accordions: [
+                    {
+                        title: "🌋 火山爆發的形成過程：聚合邊界 vs 張裂邊界 vs 熱點",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <p>當地下岩石因<strong>高溫、減壓或水分降低熔點</strong>而發生「部分熔融」，便會產生岩漿。岩漿攜帶氣體沿岩石圈裂縫上湧噴出地表，即為火山爆發：</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div class="p-2.5 bg-rose-50 border-2 border-rose-700 rounded-xl">
+                                        <div class="font-bold text-rose-900">🔥 聚合型邊界火山（猛烈爆發）</div>
+                                        <p class="mt-1">俯衝板塊釋放水分使軟流圈熔融，穿過大陸地殼時混入大量<strong>二氧化硅</strong>，岩漿<strong>黏稠度高</strong>，氣體被困積聚高壓，引發爆炸性普林尼式或皮連式噴發。</p>
+                                    </div>
+                                    <div class="p-2.5 bg-amber-50 border-2 border-amber-700 rounded-xl">
+                                        <div class="font-bold text-amber-900">🌊 張裂型邊界及熱點（溫和噴發）</div>
+                                        <p class="mt-1">張裂帶減壓熔融或<strong>熱點（Hot Spot）</strong>地幔熱柱上湧（如夏威夷羣島），基性玄武岩漿<strong>二氧化硅含量低、流動性高</strong>，氣體易釋出，多形成平緩盾狀火山。隨板塊移動，舊火山島移離熱點成死火山鏈。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "☁️ 火山爆發的直接與間接影響（熔岩、火山灰、氣體）",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <ul class="list-disc pl-4 space-y-1.5">
+                                    <li><strong>熾熱熔岩流 (Lava Flow)：</strong>燒毀並掩埋流經的房屋、道路、森林和農田，切斷通訊與電力。</li>
+                                    <li><strong>火山灰與火山碎屑流 (Pyroclastic Flow)：</strong>高速滾燙的熾雲瞬間焚毀一切；厚重火山灰壓垮屋頂、覆蓋耕地導致失收、使人呼吸困難、遮蔽陽光大幅降低能見度並<strong>癱瘓航空交通</strong>（如 2010 年冰島火山癱瘓歐洲航空）。</li>
+                                    <li><strong>有毒火山氣體：</strong>高濃度二氧化硫（SO₂）、二氧化碳及硫化氫損害眼睛與呼吸系統；二氧化硫與水汽結合形成<strong>酸雨</strong>摧毀植被；平流層硫酸氣溶膠<strong>反射太陽輻射，導致全球或區域氣溫下降</strong>。</li>
+                                    <li><strong>間接次生災害：</strong>火山灰混合暴雨或融雪形成高速<strong>火山泥流 (Mudflow / Lahar)</strong> 掩埋村莊；海底或島嶼火山崩塌引發<strong>海嘯</strong>與山泥傾瀉。</li>
+                                </ul>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "📰 3 個近年大型火山爆發事件介紹（2021–2024）",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2.5 text-xs">
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>① 2022年1月 東加洪阿東加—洪阿哈阿帕伊海底火山爆發</span>
+                                        <span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">VEI 5-6 世紀級爆發</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>太平洋板塊俯衝印度—澳洲板塊。火山灰柱衝上 58 公里高空，引發高達 15 米的越洋海嘯（遠至秘魯及日本），切斷東加唯一海底光纖通訊電纜長達數周，全島被厚火山灰覆蓋污染水源。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>② 2023–2024年 冰島雷克雅內斯半島（格林達維克）裂縫噴發</span>
+                                        <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">大西洋中脊張裂帶</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>北美板塊與歐亞板塊背離加上冰島熱點活動。地表出現長達數公里的裂縫噴發，熔岩流摧毀格林達維克鎮部分民居及道路，政府緊急築起大型土石防禦屏障保護「藍湖」地熱發電廠，全鎮 4,000 居民成功預先疏散無傷亡。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>③ 2024年 印尼魯昂火山 (Mt. Ruang) 及勒沃托比火山爆發</span>
+                                        <span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">火山碎屑與航空癱瘓</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>位於印尼俯衝帶火山弧。2024年4月魯昂火山多次猛烈噴發並發出海嘯預警，逾萬名居民緊急撤離；11月勒沃托比火山（Lewotobi Laki-Laki）噴發熾熱火山彈與萬米灰柱，造成鄰近村落傷亡並導致峇里島數十航班取消。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🛡️ 面對火山爆發的應變方法與減少損失的措施",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <div class="bg-amber-50 border-2 border-amber-700 p-2.5 rounded-xl">
+                                    <div class="font-bold text-amber-900 mb-1">😷 面對火山爆發的個人應變方法</div>
+                                    <ul class="list-disc pl-4 space-y-1">
+                                        <li><strong>接獲撤離令時：</strong>立即按政府指定疏散路線撤往高處或安全區，切勿逗留河谷或低窪地帶（防範火山泥流與碎屑流）。</li>
+                                        <li><strong>面對漫天火山灰：</strong>佩戴 <strong>N95 口罩及護目鏡</strong>（切勿戴隱形眼鏡）、穿長袖衣物；留在室內時緊閉門窗並用濕毛巾封住縫隙。</li>
+                                        <li><strong>保護房屋：</strong>在安全情況下及時清理屋頂積聚的火山灰，防止與雨水混合變重壓塌屋頂。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white border-2 border-[#023047] p-2.5 rounded-xl">
+                                    <div class="font-bold text-[#023047] mb-1">🚧 減少火山爆發損失的五大措施（及限制）</div>
+                                    <ol class="list-decimal pl-4 space-y-1">
+                                        <li><strong>監測、預測與預警系統：</strong>利用傾斜儀監測火山山體膨脹、氣體分析儀檢測二氧化硫濃度激增、地震儀探測岩漿上湧微震、紅外線衛星監測地溫（如成功預測美國聖海倫斯火山爆發）。</li>
+                                        <li><strong>具抵禦能力的建築與工程結構：</strong>興建<strong>碎石屏障及熔岩分流渠道 (Lava Diversion Channel)</strong> 將熔岩引離聚落（如意大利埃特納火山），或向熔岩噴水冷卻（如冰島赫馬島）；房屋採用<strong>加固且陡峭傾斜的屋頂</strong>卸去火山灰。<em>（限制：分流渠道容量有限、熔岩流向難完全預測、或威脅其他地區）</em>。</li>
+                                        <li><strong>土地利用規劃：</strong>編製<strong>火山災區風險地圖</strong>（如夏威夷島 1–9 級分區圖），禁止在極高危火山口周邊及泥流河道發展密集住宅。</li>
+                                        <li><strong>教育與疏散演習：</strong>如日本富士山定期舉行旅遊從業員與居民火山撤離演習，準備防災應急包。</li>
+                                        <li><strong>救援與災難保險：</strong>儲備醫療呼吸設備、帳篷與緊急援助基金。</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 5,
+                code: "ISLAND 05",
+                shortName: "5. 海嘯專題島",
+                title: "海嘯：形成、影響、近年大型事件與減災應變",
+                subtitle: "海牀垂直位移與波高變化、DART 深海預警浮標、海岸緩衝規劃",
+                themeColor: "#0284C7",
+                badgeBg: "bg-sky-600",
+                icon: "ph-waves",
+                pos: { x: 0, z: 10.8 }, // South
+                summary: "海嘯並非普通風浪，而是由強烈海底地震、海底火山爆發或海底山泥傾瀉導致「海牀突然垂直位移」所引發的連串長波長巨浪。抵岸淺水區時波高可急升至 30 米以上！",
+                keyMetrics: [
+                    { label: "外海傳播速度", val: "700 km/h 以上", note: "外海波長極長、波高僅約 1 米，船隻難察覺" },
+                    { label: "淺海波高激增", val: "可達 30 米+", note: "接近淺水海岸時海牀摩擦減速，波浪堆高" },
+                    { label: "紅樹林緩衝力", val: "消減 90% 能量", note: "100 米闊沿海紅樹林帶可大幅減輕村落破壞" }
+                ],
+                interactiveType: "tsunami-simulator",
+                accordions: [
+                    {
+                        title: "🌊 海嘯的形成過程與「深海 vs 淺海」波浪變化",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <p><strong>三大成因（95% 發生在環太平洋聚合邊界）：</strong></p>
+                                <ol class="list-decimal pl-4 space-y-1">
+                                    <li><strong>強烈海底淺源地震（最主要成因，佔 75%+）：</strong>聚合型邊界（逆衝斷層）發生黎克特震級 7.0 級以上淺源地震，導致海牀突然<strong>垂直抬升或下陷</strong>，上方龐大水體驟升，受重力下墜向四周擴散。（若僅水平移動則極少引發海嘯）。</li>
+                                    <li><strong>海底火山猛烈爆發：</strong>如 2022 年東加海底火山爆發排開大量海水。</li>
+                                    <li><strong>大規模海底或沿海山泥傾瀉：</strong>如 2018 年印尼喀拉喀托之子火山山體崩塌入海。</li>
+                                </ol>
+                                <div class="bg-sky-50 border-2 border-sky-700 p-2.5 rounded-xl mt-2">
+                                    <div class="font-bold text-sky-900">📐 為甚麼海嘯在岸邊特別致命？</div>
+                                    <p class="mt-1">在深海大洋中，海嘯波長可達數百公里，時速逾 700 公里，但波高僅約 0.5–1 米；當海嘯湧入<strong>沿岸淺水區（特別是淺水狹窄的漏斗狀海灣）</strong>時，海牀摩擦力使前浪減速、波長縮短，後浪追上擠壓，能量集中使波高暴增至 10–30 米以上的毀滅性水牆！</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "⚠️ 海嘯的四大先兆與嚴重破壞影響",
+                        openDefault: false,
+                        content: `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                <div class="p-2.5 bg-amber-50 border-2 border-amber-700 rounded-xl">
+                                    <div class="font-bold text-amber-900 mb-1">👀 海嘯來臨前的四大自然先兆</div>
+                                    <ol class="list-decimal pl-4 space-y-1 text-slate-700">
+                                        <li>在海邊感到強烈或持續時間長的地震搖晃。</li>
+                                        <li><strong>海水異常急速後退</strong>，露出大片海牀與魚蝦。</li>
+                                        <li>遠處海面出現白浪高牆迎面推進。</li>
+                                        <li>海面傳來有如火車開動或噴射機般的低沉巨響。</li>
+                                    </ol>
+                                </div>
+                                <div class="p-2.5 bg-rose-50 border-2 border-rose-700 rounded-xl">
+                                    <div class="font-bold text-rose-900 mb-1">💥 海嘯造成的嚴重破壞</div>
+                                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                                        <li><strong>淹沒沿海低窪地區：</strong>巨浪沖入內陸數公里，造成大量民眾溺斃。</li>
+                                        <li><strong>摧毀基建與重物衝擊：</strong>沖毀樓宇、公路、橋樑與碼頭，把大型船隻、汽車及漂流碎屑沖入內陸撞毀建築（甚至損毀核電廠，如 2011 日本福島核災）。</li>
+                                        <li><strong>環境與生態浩劫：</strong>沖走沙灘、改變海岸線、海水倒灌鹽化農田及污染淡水源、摧毀紅樹林與珊瑚礁，災後易爆發疫症。</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "📰 3 個重大海嘯事件深度介紹（包括近年與本世紀巨災）",
+                        openDefault: true,
+                        content: `
+                            <div class="space-y-2.5 text-xs">
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>① 2011年3月 日本東北大地震及海嘯 (Mw 9.0)</span>
+                                        <span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">經濟損失 2,350 億美元</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>太平洋板塊俯衝鄂霍次克板塊。巨浪高逾 10–40 米，越過釜石市全球最大防波堤，淹沒仙台等東北海岸內陸 10 公里，造成逾 22,000 人死亡或失蹤，更摧毀福島第一核電廠後備冷卻系統，引發三個反應堆熔融洩漏輻射。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>② 2018年9月及12月 印尼帕盧海嘯及巽他海峽火山海嘯</span>
+                                        <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">狹窄海灣與山體崩塌</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>2018年9月蘇拉威西 7.5 級地震引發海底山泥傾瀉，海浪進入狹長淺水的帕盧灣（Palu Bay）後波高放大至 6 米，加上預警過早解除，奪去逾 4,300 命；同年12月「喀拉喀托之子」火山爆發山體崩塌入海，無地震先兆下突襲沿岸造成逾 430 死。</p>
+                                </div>
+                                <div class="p-3 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="flex items-center justify-between font-bold text-[#023047]">
+                                        <span>③ 2022年東加火山越洋海嘯 / 2024年日本能登半島海嘯</span>
+                                        <span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">近年新型海嘯挑戰</span>
+                                    </div>
+                                    <p class="text-slate-600 mt-1"><strong>成因與影響：</strong>2022 東加海底火山爆發引發高達 15 米巨浪摧毀島上渡假村，衝擊波更跨越太平洋在秘魯造成溺亡；2024年1月能登半島 7.5 級地震後僅數分鐘，高達 4–5 米海嘯即抵達珠洲市及輪島港，凸顯近岸海嘯逃生時間極短的威脅。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🛡️ 面對海嘯的應變方法與減少海嘯損失的措施",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2.5 text-xs text-slate-700">
+                                <div class="bg-sky-50 border-2 border-sky-700 p-2.5 rounded-xl">
+                                    <div class="font-bold text-sky-900 mb-1">🏃 面對海嘯的個人逃生黃金守則</div>
+                                    <ul class="list-disc pl-4 space-y-1">
+                                        <li><strong>立即往高地或內陸疏散：</strong>在海邊感到強震或見海水後退，切勿等待官方警報或收拾財物，立即徒步跑向海拔較高的山坡或鋼筋混凝土<strong>海嘯疏散塔（垂直疏散）</strong>。</li>
+                                        <li><strong>切勿過早返回岸邊：</strong>海嘯由多波巨浪組成，<strong>第二或第三波往往比第一波更猛烈</strong>（相隔可達一小時以上），必須留在高地數小時直至官方正式解除海嘯警報。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white border-2 border-[#023047] p-2.5 rounded-xl">
+                                    <div class="font-bold text-[#023047] mb-1">🌊 減少海嘯損失的五大措施（及海堤爭議）</div>
+                                    <ol class="list-decimal pl-4 space-y-1">
+                                        <li><strong>深海監測與海嘯預警系統 (DART System)：</strong>在深海海牀安裝<strong>海底海嘯感測器</strong>偵測水壓變化，傳送至海面<strong>浮標站</strong>再經人造衛星傳回太平洋及印度洋海嘯預警中心，透過手機廣播及岸邊高音喇叭發佈警報。</li>
+                                        <li><strong>具抵禦能力的建築結構：</strong>修築高大混凝土<strong>海堤 (Sea Wall) 與防波堤</strong>反射海浪能量；沿海建築地基加固、<strong>底層架空不作居住用途</strong>，並興建垂直海嘯疏散塔。<em>（注意海堤弊端：造價極高、破壞海岸生態與景觀、令居民產生假安全感疏於防範，且特大海嘯仍可越過海堤）</em>。</li>
+                                        <li><strong>海岸土地利用規劃（如日本仙台模式）：</strong>沿海劃設<strong>緩衝林地或紅樹林保護帶</strong>（消減波浪能量）及儲水渠道；高危紅區禁建住宅及醫院；把沿海道路建在加高堤基上並規劃直達高地的最短疏散路線與清晰路牌。</li>
+                                        <li><strong>教育與海嘯疏散演習：</strong>定期舉辦社區逃生演習及防災教育。</li>
+                                        <li><strong>救援系統與災後保險：</strong>組織配備直升機與衝鋒舟的救援隊。</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 6,
+                code: "ISLAND 06",
+                shortName: "6. 破壞程度因素",
+                title: "某地受構造災害破壞程度的因素",
+                subtitle: "災害特點 vs 受災地區特點、互動分析：為何欠發達國家（LDCs）受創更深？",
+                themeColor: "#8B5CF6",
+                badgeBg: "bg-purple-600",
+                icon: "ph-scales",
+                pos: { x: -9.35, z: 5.4 }, // South-West
+                summary: "相同震級的地震，為何在日本或智利傷亡較少，而在海地或厄瓜多爾卻造成毀滅性災難？一地的受災程度同時取決於「自然災害本身的特點」與「人文社會的脆弱性」。",
+                keyMetrics: [
+                    { label: "研發支出對比", val: "美日 >3% vs 海地 <0.5%", note: "佔 GDP 百分比決定監測與防禦科技水平" },
+                    { label: "教材經典比較", val: "2016 日本 vs 厄瓜多爾", note: "日本 7.0級 (49死) vs 厄瓜多爾 7.8級 (661死)" },
+                    { label: "關鍵人為因素", val: "建築、規劃、政府效率", note: "貪污腐敗與落後交通嚴重拖慢災後救援" }
+                ],
+                interactiveType: "ldc-analyzer",
+                accordions: [
+                    {
+                        title: "📊 影響某地受構造災害破壞程度的兩大類因素",
+                        openDefault: true,
+                        content: `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                <div class="bg-purple-50 border-2 border-purple-700 rounded-xl p-2.5">
+                                    <div class="font-bold text-purple-900 mb-1">⚡ A. 構造災害本身的特點 (自然因素)</div>
+                                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                                        <li><strong>災害強度 (Magnitude)：</strong>級數愈高，釋放能量愈多，破壞愈大。</li>
+                                        <li><strong>與災害源頭距離及震源深度：</strong>震源愈淺（<70 km）、離震央或火山口愈近，能量流失愈少，地面震動愈劇烈。</li>
+                                        <li><strong>持續時間 (Duration)：</strong>震動或噴發時間愈長，建築物愈易崩塌。</li>
+                                        <li><strong>發生時間 (Time of Occurrence)：</strong>午夜熟睡時民眾難以及時逃生；上下班繁忙時間則易因交通擠塞增加傷亡。</li>
+                                        <li><strong>始現速度 (Speed of Onset)：</strong>地震瞬間發生無預警，最難防禦；海嘯及火山較有時間預警。</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-indigo-50 border-2 border-indigo-700 rounded-xl p-2.5">
+                                    <div class="font-bold text-indigo-900 mb-1">🏙️ B. 受災地區的特點 (自然與人文因素)</div>
+                                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                                        <li><strong>人口與樓宇密度：</strong>人口愈稠密（如大城市），受威脅人數愈多。</li>
+                                        <li><strong>經濟發展水平：</strong>決定資金與防禦科技能力（但發達地區基建昂貴，絕對經濟金額損失可能更高）。</li>
+                                        <li><strong>民眾警覺性與防範準備：</strong>上一次大災害距今愈久，民眾愈易鬆懈。</li>
+                                        <li><strong>陸地與沿海地勢：</strong>陡坡易引發山泥傾瀉及加速熔岩流動；低窪海岸及漏斗形淺海灣會放大海嘯波高。</li>
+                                        <li><strong>災後天氣狀況：</strong>寒潮、熱浪或暴雨（引發泥流）會增加露天災民死亡率。</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🔍 深入剖析：為甚麼欠發達國家 (LDCs) 受構造災害影響較嚴重？",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <p>比較 <strong>2010年海地地震（7.0級，逾30萬死）</strong>、<strong>2016年厄瓜多爾地震（7.8級，661死）</strong> 與 <strong>2016年日本熊本/九州地震（7.0級，49死）</strong>，可歸納出欠發達國家災情慘重的 6 大原因：</p>
+                                <ol class="list-decimal pl-4 space-y-1.5">
+                                    <li><strong>缺乏資金與科技水平低：</strong>人均 GDP 低，科研支出佔 GDP 不足 1%，無力設立先進監測預警系統或購買生命探測器等救援裝備；鄉郊居民甚至無法接收廣播警報。</li>
+                                    <li><strong>建築物穩固度極差：</strong>大量房屋以泥磚、碎石或劣質混凝土自行搭建，缺乏鋼筋抗震結構；加上政府監管不力及貪污，建築法例形同虛設，地震時瞬間倒塌。</li>
+                                    <li><strong>運輸與通訊網絡落後：</strong>道路狹窄且未鋪設好，災後極易因山泥傾瀉中斷，阻礙救援隊伍與國際物資進入災區。</li>
+                                    <li><strong>城市人口過度稠密與貧民窟擴張：</strong>大量貧民聚居於陡坡或低窪高危地帶，缺乏安全疏散空間。</li>
+                                    <li><strong>教育水平低與傳統守舊觀念：</strong>識字率較低，缺乏防災知識與定期演習，災難發生時驚慌失措不懂自救。</li>
+                                    <li><strong>政府效率低與管治腐敗：</strong>缺乏應急救援統籌能力，極度依賴外國援助，災後重建極緩慢（如海地震後 8 年仍有數萬人住帳篷，疫症肆虐）。</li>
+                                </ol>
+                                <div class="bg-emerald-50 border-l-4 border-emerald-600 p-2 rounded-r-xl text-xs">
+                                    <strong>🌟 積極改善個案 —— 墨西哥：</strong>雖屬發展中國家，但汲取 1985 年大地震（萬人死亡）教訓後，積極設立 <strong>SASMEX 地震預警系統</strong>、開發手機警報 App、收緊建築規例及每年 9 月 19 日舉行全國演習，令 2017 年 7.1 級地震傷亡大幅減至 361 人。
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            {
+                id: 7,
+                code: "ISLAND 07",
+                shortName: "7. 居民去留抉擇",
+                title: "災害頻生地區居民對選擇去留的考慮因素",
+                subtitle: "風險認知、四大經濟機會、社會文化聯繫與移民限制 + 說服居民撤離任務",
+                themeColor: "#EC4899",
+                badgeBg: "bg-pink-600",
+                icon: "ph-users-three",
+                pos: { x: -9.35, z: -5.4 }, // North-West
+                summary: "既然火山與地震帶如此危險，為何印尼峇里島、日本、冰島與加州依然人口稠密？居民在衡量「離開」與「留下」時，是綜合評估風險、經濟機會、鄉土聯繫與遷移限制後的抉擇。",
+                keyMetrics: [
+                    { label: "冰島地熱發電", val: "佔全國電力 25%", note: "加上水力發電共提供近 100% 潔淨再生能源" },
+                    { label: "峇里島旅遊業", val: "每年 500 萬遊客", note: "壯麗巴杜爾火山、温泉與梯田帶動豐厚收入" },
+                    { label: "理性決定準則", val: "衡量利益與損失", note: "主觀風險感知因經歷、教育與信仰而異" }
+                ],
+                interactiveType: "persuasion-game",
+                accordions: [
+                    {
+                        title: "💎 機會因素：構造活動帶來的四大經濟益處",
+                        openDefault: true,
+                        content: `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+                                <div class="p-2.5 bg-emerald-50 border-2 border-emerald-700 rounded-xl">
+                                    <div class="font-bold text-emerald-900">🌾 1. 肥沃火山土壤有利農業</div>
+                                    <p class="mt-1">火山灰及風化後的凝固熔岩富含<strong>鉀、鎂等礦物質</strong>，且孔隙多、保水力強，極適合種植水稻、咖啡及蔬果（如印尼爪哇島及峇里島火山山麓人口極密集）。</p>
+                                </div>
+                                <div class="p-2.5 bg-amber-50 border-2 border-amber-700 rounded-xl">
+                                    <div class="font-bold text-amber-900">📸 2. 獨特景觀有利旅遊業</div>
+                                    <p class="mt-1">高聳褶曲山（如阿爾卑斯山）、火山口湖、<strong>温泉 (Hot Springs)</strong> 及<strong>間歇泉 (Geysers，如美國黃石大稜鏡温泉)</strong> 吸引大量遊客，創造酒店與導賞就業機會。</p>
+                                </div>
+                                <div class="p-2.5 bg-sky-50 border-2 border-sky-700 rounded-xl">
+                                    <div class="font-bold text-sky-900">⚡ 3. 潔淨可再生地熱能 (Geothermal)</div>
+                                    <p class="mt-1">地底熾熱岩石加熱地下水產生蒸汽，可推動渦輪機發電及提供室內暖氣（如冰島、新西蘭），吸引高耗能工業外資進駐。</p>
+                                </div>
+                                <div class="p-2.5 bg-purple-50 border-2 border-purple-700 rounded-xl">
+                                    <div class="font-bold text-purple-900">⛏️ 4. 豐富礦產與建材有利採礦業</div>
+                                    <p class="mt-1">岩漿冷卻及熱液作用形成<strong>銅、金、銀、鑽石及硫磺</strong>（如印尼火山口採硫業）；浮石則為輕巧隔熱的優質建築材料。</p>
+                                </div>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "🧠 風險感知差異、社會文化聯繫與移民限制",
+                        openDefault: false,
+                        content: `
+                            <div class="space-y-2 text-xs text-slate-700">
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="font-bold text-[#023047]">1. 主觀風險看法 (Risk Perception) 因人而異：</div>
+                                    <ul class="list-disc pl-4 mt-1 space-y-1">
+                                        <li><strong>過往經歷：</strong>剛經歷慘重地震的生還者最傾向離開；長期住在睡火山旁的居民則認為風險極低。</li>
+                                        <li><strong>宗教與性格：</strong>宿命論者認為災害是「上天安排」無可避免；天生樂觀者誤以為「災害不會在同一地點再發生」。</li>
+                                        <li><strong>對科技與政府的信任：</strong>高教育水平專業人士相信抗震大廈、海堤與預警系統足以保障安全。</li>
+                                    </ul>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="font-bold text-[#023047]">2. 社會與文化聯繫 (Social & Cultural Ties)：</div>
+                                    <p class="mt-1">世代定居於此，不願離開故鄉、祖先土地、親友網絡及傳統文化習俗；年長或低技術農民缺乏積蓄與其他謀生技能，害怕搬遷後失業。</p>
+                                </div>
+                                <div class="p-2.5 bg-white border-2 border-[#023047] rounded-xl">
+                                    <div class="font-bold text-[#023047]">3. 移民的限制（政治屏障與自然環境限制）：</div>
+                                    <p class="mt-1">他國嚴格的移民法規限制跨國移居；而地球上遠離板塊邊界、沒有構造災害的地區，往往是<strong>極地、高山、乾燥荒漠或茂密熱帶雨林</strong>，氣候極端且開發成本高昂，反而不如沿海平原宜居。</p>
+                                </div>
+                            </div>
+                        `
+                    }
+                ]
+            }
+        ];
+
+        /********************************************************************
+         * 2. INTERACTIVE MINI-APPS DATA (SIMULATORS & ROLEPLAY ACTIVITIES)
+         ********************************************************************/
+        const BOUNDARY_SIM_DATA = {
+            "divergent-ocean": {
+                title: "海底張裂型邊界（洋—洋背離）",
+                plates: "北美洲板塊 ← → 歐亞板塊 / 納斯卡板塊 ← → 太平洋板塊",
+                force: "張力 (Tensional Force)",
+                processes: "正斷層作用 + 噴出及侵入火山作用",
+                landforms: ["大洋中脊 (大西洋中脊)", "海底中央裂谷", "轉換斷層", "海底火山與火山島 (復活節島、冰島)"],
+                desc: "板塊互相背離拉裂岩石圈，軟流圈減壓熔融，熾熱岩漿上湧填補裂縫並冷卻形成新大洋地殼。因熱能浮力隆起成山脊，頂部受張力下陷成裂谷。",
+                svgType: "div-ocean"
+            },
+            "divergent-land": {
+                title: "陸地張裂型邊界（陸—陸背離）",
+                plates: "努比亞板塊 ← → 索馬里板塊（非洲板塊分裂）",
+                force: "張力 (Tensional Force)",
+                processes: "正斷層作用 + 火山作用",
+                landforms: ["大陸裂谷 (東非大裂谷)", "斷塊山 (地壘) 與陡峭斷層崖", "裂谷湖泊 (維多利亞湖周邊)", "陸上活火山"],
+                desc: "大陸岩石圈受張力拉長變薄並產生多道正斷層，中間上盤岩塊沿斷層面下沉形成平坦寬闊的裂谷，岩漿沿裂縫上湧形成火山。",
+                svgType: "div-land"
+            },
+            "convergent-oc": {
+                title: "聚合型邊界：洋—陸碰撞",
+                plates: "納斯卡板塊 (大洋) → ← 南美洲板塊 (大陸)",
+                force: "擠壓力 (Compressional Force)",
+                processes: "俯衝消亡 + 褶曲作用 + 逆斷層 + 侵入/噴出火山作用",
+                landforms: ["秘魯—智利海溝", "安第斯褶曲山脈", "大陸火山弧 (欽博拉索火山)", "地底大型岩基"],
+                desc: "高密度大洋板塊俯衝入大陸板塊之下形成深海溝；大陸邊緣沉積岩受擠壓褶曲隆起；俯衝板塊釋水使軟流圈熔融，岩漿上湧形成火山與岩基。",
+                svgType: "conv-oc"
+            },
+            "convergent-oo": {
+                title: "聚合型邊界：洋—洋碰撞",
+                plates: "太平洋板塊 → ← 菲律賓板塊 / 印度—澳洲板塊 → ← 歐亞板塊",
+                force: "擠壓力 (Compressional Force)",
+                processes: "俯衝消亡 + 海底火山作用 + 逆斷層",
+                landforms: ["馬里亞納海溝 / 爪哇海溝 / 日本海溝", "海底火山鏈", "弧形排列的火山島弧 (日本、印尼、菲律賓)"],
+                desc: "兩塊大洋板塊相撞，密度較高的一方俯衝形成深海溝；俯衝帶產生的岩漿沿裂縫噴出海牀，經多次爆發堆高露出海面，形成與海溝平行的火山島弧。",
+                svgType: "conv-oo"
+            },
+            "convergent-cc": {
+                title: "聚合型邊界：陸—陸碰撞",
+                plates: "印度—澳洲板塊 (印度次大陸) → ← 歐亞板塊 (亞洲大陸)",
+                force: "強大擠壓力 (Compressional Force)",
+                processes: "劇烈褶曲作用 + 逆斷層作用（無板塊俯衝、無活火山）",
+                landforms: ["高聳新褶曲山脈 (喜馬拉雅山脈)", "青藏高原 (地殼厚達 75 km)", "大型逆衝斷層帶"],
+                desc: "古海洋地殼完全俯衝後，兩塊厚而輕的大陸地殼正面相撞，沒有一方下沉。板塊間的沉積岩被劇烈壓皺抬升成最高山脈，因缺乏俯衝岩漿供應故無活火山。",
+                svgType: "conv-cc"
+            },
+            "transform": {
+                title: "板塊轉換邊界（水平擦過）",
+                plates: "太平洋板塊 ⇅ 北美洲板塊",
+                force: "剪切力 (Shearing Force)",
+                processes: "走滑斷層作用（地殼不增生亦不消亡）",
+                landforms: ["聖安德烈亞斯轉換斷層", "錯位河道與斷層線谷"],
+                desc: "兩塊板塊沿垂直斷層面水平相互擦過，凹凸不平的岩面鎖死積聚應力，突然斷裂時引發強烈淺層地震，但沒有岩漿形成，故無火山。",
+                svgType: "transform"
+            }
+        };
+
+        // Island 6 Interactive LDC vs MDC Vulnerability Scenarios
+        const LDC_QUIZ_SCENARIOS = [
+            {
+                id: "q1",
+                question: "1. 2016年4月，日本九州（7.0級）與厄瓜多爾（7.8級）先後發生淺層地震，為何厄瓜多爾的死亡人數（661人）遠高於日本（49人），且倒塌樓宇多達 7,000 幢？",
+                options: [
+                    { text: "A. 因為厄瓜多爾位於張裂型板塊邊界，岩漿噴發燒毀房屋", correct: false, feedback: "不正確！厄瓜多爾與日本同樣位於環太平洋聚合型板塊邊界。" },
+                    { text: "B. 厄瓜多爾人均 GDP 及科研投入較低，大量磚石建築缺乏抗震設計，且預警與救援設備不足", correct: true, feedback: "完全正確！經濟發展水平影響抗震建築法規執行、預警系統覆蓋率及災後搜救效率。" },
+                    { text: "C. 日本地震發生在無人居住的荒漠地帶，因此沒有影響城市", correct: false, feedback: "不正確！日本熊本地震鄰近人口密集區，低傷亡主要歸功於嚴格抗震結構及防災演習。" }
+                ]
+            },
+            {
+                id: "q2",
+                question: "2. 聯合國教科文組織指出：「即使當局在欠發達國家安裝了先進的海嘯預警系統，若缺乏某一條件，系統也只會形同虛設。」該條件是甚麼？",
+                options: [
+                    { text: "A. 完整的鄉郊通訊接收網絡，以及透過教育和演習培養民眾的備災意識與逃生能力", correct: true, feedback: "答對了！在欠發達國家，若偏遠村落收不到警報，或民眾教育水平低、守舊不願參與疏散演習，預警系統便無法挽救生命。" },
+                    { text: "B. 在所有海岸線興建高達 50 米的鋼鐵密封圍牆", correct: false, feedback: "不正確！超高海堤成本極昂貴且破壞生態，並非欠發達國家可負擔的方案。" },
+                    { text: "C. 把全國所有國民強制移民到南極洲或撒哈拉沙漠", correct: false, feedback: "不正確！極地與荒漠受自然環境限制，開發成本極高且不宜居。" }
+                ]
+            }
+        ];
+
+        // Island 7 Interactive Persuasion Roleplay Data (Persuade Residents to Evacuate/Relocate)
+        const PERSUASION_RESIDENTS = [
+            {
+                id: "farmer",
+                name: "巴厘島阿貢火山腳下的老農夫 — 瓦揚伯伯 (65歲)",
+                avatar: "👨‍🌾",
+                role: "世代務農 • 低技術 • 依戀故土",
+                stance: "「火山灰讓我的水稻田年年豐收！我年紀大了，除了種田甚麼都不會，而且祖先的祠堂就在村裏，搬去大城市我怎麼生活？我不走！」",
+                trust: 25,
+                persuaded: false,
+                options: [
+                    {
+                        label: "直接責罵他愚蠢，強調火山隨時爆發會把他燒死",
+                        impact: -15,
+                        reply: "「你這年輕人怎麼咒我死！上次疏散後我們回來還不是好好的？我不聽你說了！」（恐嚇與說教只會增加老農夫的抗拒感）"
+                    },
+                    {
+                        label: "承認火山土壤肥沃的優勢，但出示氣象局「暴雨+火山灰泥流 (Lahar)」預警圖，並提供政府安排的「同區高地安全農莊安置津貼與親友集體遷村方案」",
+                        impact: +75,
+                        reply: "「原來大雨混和火山灰會形成泥流在幾小時內掩埋整個山谷……如果政府能讓我們全村親友一起搬到安全高地繼續耕作，又有搬遷津貼，那我願意跟大家一起撤離！」（成功對症下藥：兼顧生計、社會聯繫與迫切風險！）"
+                    },
+                    {
+                        label: "建議他自費購買昂貴的國際商業保險，並轉行做電腦程式設計員",
+                        impact: +5,
+                        reply: "「我連智能手機都不太會用，哪來的錢買保險和學寫程式？」（忽略了居民的社會經濟地位與年齡限制）"
+                    }
+                ]
+            },
+            {
+                id: "innkeeper",
+                name: "火山温泉渡假村東主 — 佐藤女士 (42歲)",
+                avatar: "👩‍💼",
+                role: "旅遊業投資者 • 依賴地熱温泉收入 • 擔心停業損失",
+                stance: "「現在正是旅遊旺季！大稜鏡和火山温泉吸引這麼多外國遊客，如果我現在聽你勸告關閉旅館撤離，這個月的貸款和員工薪水誰來付？」",
+                trust: 30,
+                persuaded: false,
+                options: [
+                    {
+                        label: "指出傾斜儀與二氧化硫氣體濃度已達危險紅線，一旦爆發封路將導致遊客死傷及永久破產；同時介紹政府的「災區商戶停業補助、災害保險理賠及安全區分店低息貸款」",
+                        impact: +70,
+                        reply: "「你說得對，如果火山碎屑流下來，不僅遊客性命不保，我的招牌也徹底毀了。既然有科學監測數據確認高風險，又有政府停業補助與保險支援，我馬上安排巴士帶員工和遊客撤離！」（成功結合科學預警與經濟補償方案！）"
+                    },
+                    {
+                        label: "告訴她火山爆發只會讓全球氣溫下降，對她的温泉旅館完全沒有影響",
+                        impact: -20,
+                        reply: "「胡說八道！火山口就在五公里外，怎麼可能只影響氣溫？」（地理知識錯誤，失去信任）"
+                    },
+                    {
+                        label: "建議她在旅館天台加裝太陽能板發電",
+                        impact: 0,
+                        reply: "「這跟現在要不要撤離避災有甚麼關係？」（未能回應經濟損失與安全兩難）"
+                    }
+                ]
+            },
+            {
+                id: "couple",
+                name: "住在沿海睡眠火山與斷層帶的新婚夫婦 — 陳先生與陳太太",
+                avatar: "👫",
+                role: "樂觀主義新居民 • 缺乏防災經歷 • 迷信海堤絕對安全",
+                stance: "「這座火山已經一百年沒爆發了，而且海邊有 10 米高的混凝土海堤保護，房價又便宜、交通又方便，根本不需要搬走或撤離吧！」",
+                trust: 35,
+                persuaded: false,
+                options: [
+                    {
+                        label: "向他們展示 2011 年日本釜石市海堤被越過及睡火山蘇醒的案例，說明「睡火山並非死火山」且狹窄海灣會放大海嘯波高；邀請他們遷往「高地抗震新社區」",
+                        impact: +65,
+                        reply: "「天啊！原來睡火山休眠越久，積聚的氣體壓力可能更猛烈，而且海堤也擋不住特大海嘯……為了將來孩子的安全，我們決定搬去高地的抗震社區！」（成功打破樂觀偏誤與海堤假安全感！）"
+                    },
+                    {
+                        label: "叫他們立刻移民去格陵蘭冰原或撒哈拉沙漠定居，因為那裏完全沒有板塊邊界",
+                        impact: -10,
+                        reply: "「極地和沙漠怎麼住人？那裏連工作和醫院都沒有！」（忽略了自然環境對人口分佈的限制）"
+                    },
+                    {
+                        label: "認同他們的看法，說災害是上天注定的，不用做任何準備",
+                        impact: -25,
+                        reply: "「既然你也覺得不用管，那我們就繼續留下來睡覺了。」（未能提升防災警覺性）"
+                    }
+                ]
+            }
+        ];
+
+        /********************************************************************
+         * 3. APPLICATION STATE & RESPONSIVE UI LOGIC
+         ********************************************************************/
+        let currentIslandId = 1;
+        let exploredIslands = new Set([1]);
+        let isDrawerCollapsed = false;
+        let currentBoundaryKey = "divergent-ocean";
+        let tsunamiDepthMode = "deep"; // 'deep' | 'shallow' | 'bay'
+        let ldcFactorsState = {
+            gdp: 20,        // Low GDP / R&D
+            building: 25,   // Poor building quality
+            warning: 30,    // Weak warning & transport
+            education: 25   // Low awareness
+        };
+        let quizAnswers = {};
+
+        function updateProgressUI() {
+            document.getElementById('explored-count').textContent = exploredIslands.size;
+            renderTopNavPills();
+            update3DLabelsActiveState();
+        }
+
+        function renderTopNavPills() {
+            const container = document.getElementById('island-nav-pills');
+            container.innerHTML = ISLANDS_DATA.map(island => {
+                const isActive = island.id === currentIslandId;
+                const isExplored = exploredIslands.has(island.id);
+                return `
+                    <button onclick="selectIsland(${island.id})"
+                        class="toy-btn px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shrink-0
+                        ${isActive
+                            ? 'bg-[#023047] text-amber-300 border-2 border-amber-400 scale-105'
+                            : 'bg-[#FFFDF7] text-[#023047] hover:bg-amber-100 border-2 border-[#023047]'}">
+                        <i class="ph-fill ${island.icon} text-sm" style="color: ${isActive ? '#FCD34D' : island.themeColor}"></i>
+                        <span>${island.shortName}</span>
+                        ${isExplored ? '<i class="ph-fill ph-check-circle text-emerald-500 text-xs"></i>' : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectIsland(id, openDrawerOnSelect = true) {
+            currentIslandId = id;
+            exploredIslands.add(id);
+            updateProgressUI();
+            renderDrawerContent(id);
+            focusCameraOnIsland(id);
+
+            if (openDrawerOnSelect && isDrawerCollapsed) {
+                setDrawerCollapsed(false);
+            }
+        }
+
+        function navigateIsland(direction) {
+            let nextId = currentIslandId + direction;
+            if (nextId < 1) nextId = ISLANDS_DATA.length;
+            if (nextId > ISLANDS_DATA.length) nextId = 1;
+            selectIsland(nextId, true);
+        }
+
+        function handleHeaderBarClick(e) {
+            if (window.innerWidth < 1024 && !e.target.closest('button')) {
+                setDrawerCollapsed(!isDrawerCollapsed);
+            }
+        }
+
+        function toggleDrawerCollapse(e) {
+            e.stopPropagation();
+            setDrawerCollapsed(!isDrawerCollapsed);
+        }
+
+        function setDrawerCollapsed(collapse) {
+            isDrawerCollapsed = collapse;
+            const body = document.getElementById('drawer-body');
+            const footer = document.getElementById('drawer-footer');
+            const toggleText = document.getElementById('drawer-toggle-text');
+            const toggleIcon = document.getElementById('drawer-toggle-icon');
+            const desktopText = document.getElementById('desktop-toggle-text');
+            const desktopIcon = document.getElementById('desktop-toggle-icon');
+
+            if (isDrawerCollapsed) {
+                body.classList.add('hidden');
+                footer.classList.add('hidden');
+                if (toggleText) toggleText.textContent = '展開學習';
+                if (toggleIcon) toggleIcon.className = 'ph-bold ph-caret-up text-sm';
+                if (desktopText) desktopText.textContent = '展開';
+                if (desktopIcon) desktopIcon.className = 'ph-bold ph-arrows-out-simple text-sm';
+            } else {
+                body.classList.remove('hidden');
+                footer.classList.remove('hidden');
+                if (toggleText) toggleText.textContent = '收起面板';
+                if (toggleIcon) toggleIcon.className = 'ph-bold ph-caret-down text-sm';
+                if (desktopText) desktopText.textContent = '收起';
+                if (desktopIcon) desktopIcon.className = 'ph-bold ph-arrows-in-simple text-sm';
+            }
+        }
+
+        function toggleAccordion(index) {
+            const content = document.getElementById(`acc-content-${index}`);
+            const icon = document.getElementById(`acc-icon-${index}`);
+            if (!content) return;
+            const isOpen = content.classList.contains('open');
+            if (isOpen) {
+                content.classList.remove('open');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('open');
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function expandAllAccordions(expand) {
+            const contents = document.querySelectorAll('.accordion-content');
+            contents.forEach((el, idx) => {
+                const icon = document.getElementById(`acc-icon-${idx}`);
+                if (expand) {
+                    el.classList.add('open');
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                } else {
+                    el.classList.remove('open');
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            });
+        }
+
+        function toggleHelpModal(show) {
+            const modal = document.getElementById('help-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        /********************************************************************
+         * 4. RENDERING ISLAND CONTENT & INTERACTIVE MODULES
+         ********************************************************************/
+        function renderDrawerContent(islandId) {
+            const island = ISLANDS_DATA.find(i => i.id === islandId);
+            if (!island) return;
+
+            document.getElementById('drawer-island-badge').textContent = island.code;
+            document.getElementById('drawer-island-title').textContent = island.title;
+
+            const drawerBody = document.getElementById('drawer-body');
+
+            // 1. Hero Summary Card + Quick Metrics
+            let html = `
+                <div class="bg-white border-2 border-[#023047] rounded-2xl p-3.5 shadow-sm">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                            <span class="inline-block text-[11px] font-bold text-white px-2.5 py-0.5 rounded-full ${island.badgeBg} border border-[#023047] mb-1">
+                                ${island.shortName}
+                            </span>
+                            <h3 class="font-black text-base sm:text-lg text-[#023047] leading-snug">${island.subtitle}</h3>
+                        </div>
+                        <div class="w-10 h-10 rounded-2xl flex items-center justify-center border-2 border-[#023047] shrink-0" style="background-color: ${island.themeColor}22; color: ${island.themeColor}">
+                            <i class="ph-fill ${island.icon} text-2xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-700 leading-relaxed mb-3">${island.summary}</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        ${island.keyMetrics.map(m => `
+                            <div class="bg-amber-50/70 border border-slate-300 rounded-xl p-2 text-center">
+                                <div class="text-[10px] text-slate-500 font-bold">${m.label}</div>
+                                <div class="font-black text-xs sm:text-sm text-[#023047] my-0.5">${m.val}</div>
+                                <div class="text-[10px] text-slate-600 leading-tight hidden sm:block">${m.note}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            // 2. Interactive Module Specific to the Island
+            html += renderInteractiveModule(island);
+
+            // 3. Expand/Collapse Controls for Mobile Convenience
+            html += `
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-xs font-black text-[#023047] flex items-center gap-1">
+                        <i class="ph-fill ph-book-open-text text-orange-500"></i> 島嶼教材知識庫（可點擊展開/收合）
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="expandAllAccordions(true)" class="text-[11px] font-bold text-sky-700 hover:underline px-1.5 py-0.5 bg-sky-100 rounded-lg border border-sky-300">全部展開</button>
+                        <button onclick="expandAllAccordions(false)" class="text-[11px] font-bold text-slate-700 hover:underline px-1.5 py-0.5 bg-slate-200 rounded-lg border border-slate-300">全部收起</button>
+                    </div>
+                </div>
+            `;
+
+            // 4. Collapsible Accordions
+            html += `<div class="space-y-2.5 pb-4">`;
+            island.accordions.forEach((acc, idx) => {
+                const isOpen = acc.openDefault;
+                html += `
+                    <div class="bg-white border-2 border-[#023047] rounded-2xl overflow-hidden shadow-sm">
+                        <button onclick="toggleAccordion(${idx})" class="w-full px-3.5 py-3 bg-amber-50/60 hover:bg-amber-100/70 flex items-center justify-between text-left font-bold text-xs sm:text-sm text-[#023047] transition-colors">
+                            <span>${acc.title}</span>
+                            <i id="acc-icon-${idx}" class="ph-bold ph-caret-down text-base shrink-0 transition-transform duration-200" style="transform: ${isOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
+                        </button>
+                        <div id="acc-content-${idx}" class="accordion-content ${isOpen ? 'open' : ''}">
+                            <div class="p-3.5 border-t-2 border-slate-200">
+                                ${acc.content}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+
+            drawerBody.innerHTML = html;
+            drawerBody.scrollTop = 0;
+
+            // Initialize sub-interactive listeners if needed
+            if (island.interactiveType === "boundary-simulator") {
+                updateBoundarySimUI(currentBoundaryKey);
+            } else if (island.interactiveType === "tsunami-simulator") {
+                updateTsunamiSimUI(tsunamiDepthMode);
+            } else if (island.interactiveType === "ldc-analyzer") {
+                updateLdcAnalyzerUI();
+            }
+        }
+
+        function renderInteractiveModule(island) {
+            switch (island.interactiveType) {
+                case "earth-layers":
+                    return `
+                        <div class="bg-emerald-50 border-2 border-[#023047] rounded-2xl p-3.5">
+                            <div class="font-black text-xs sm:text-sm text-[#023047] mb-2 flex items-center justify-between">
+                                <span>🔬 互動地球剖面探測儀（點擊圈層查看狀態）</span>
+                                <span class="text-[11px] bg-white px-2 py-0.5 rounded-full border border-[#023047]">1:50 地殼地核比</span>
+                            </div>
+                            <div class="grid grid-cols-4 gap-1.5 mb-2.5 text-xs font-bold">
+                                <button onclick="showEarthLayerInfo('crust')" class="toy-btn bg-amber-300 text-[#023047] border-2 border-[#023047] rounded-xl py-1.5">1. 地殼</button>
+                                <button onclick="showEarthLayerInfo('litho')" class="toy-btn bg-emerald-300 text-[#023047] border-2 border-[#023047] rounded-xl py-1.5">2. 岩石圈</button>
+                                <button onclick="showEarthLayerInfo('astheno')" class="toy-btn bg-orange-400 text-white border-2 border-[#023047] rounded-xl py-1.5">3. 軟流圈</button>
+                                <button onclick="showEarthLayerInfo('core')" class="toy-btn bg-rose-500 text-white border-2 border-[#023047] rounded-xl py-1.5">4. 地核</button>
+                            </div>
+                            <div id="earth-layer-detail" class="bg-white border-2 border-[#023047] rounded-xl p-2.5 text-xs text-slate-700">
+                                <strong>【岩石圈與軟流圈】</strong> 岩石圈（固態地殼 + 地幔最上層，厚 100–200 km）分裂為構造板塊，浮在固態但黏稠可流動的軟流圈（深 100–350 km）之上。
+                            </div>
+                        </div>
+                    `;
+
+                case "boundary-simulator":
+                    return `
+                        <div class="bg-orange-50 border-2 border-[#023047] rounded-2xl p-3.5">
+                            <div class="font-black text-xs sm:text-sm text-[#023047] mb-2 flex items-center gap-1.5">
+                                <i class="ph-fill ph-sliders text-orange-600 text-base"></i>
+                                <span>互動構造地貌模擬器（切換邊界觀察形成過程）</span>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-3 text-[11px] font-bold">
+                                <button onclick="updateBoundarySimUI('divergent-ocean')" id="sim-btn-divergent-ocean" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">海底張裂 (中脊)</button>
+                                <button onclick="updateBoundarySimUI('divergent-land')" id="sim-btn-divergent-land" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">陸地張裂 (裂谷)</button>
+                                <button onclick="updateBoundarySimUI('convergent-oc')" id="sim-btn-convergent-oc" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">洋—陸碰撞</button>
+                                <button onclick="updateBoundarySimUI('convergent-oo')" id="sim-btn-convergent-oo" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">洋—洋碰撞</button>
+                                <button onclick="updateBoundarySimUI('convergent-cc')" id="sim-btn-convergent-cc" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">陸—陸碰撞</button>
+                                <button onclick="updateBoundarySimUI('transform')" id="sim-btn-transform" class="sim-tab-btn border-2 border-[#023047] rounded-xl py-1.5 px-2 bg-white">轉換邊界 (斷層)</button>
+                            </div>
+                            <div id="boundary-sim-display" class="bg-white border-2 border-[#023047] rounded-xl p-3"></div>
+                        </div>
+                    `;
+
+                case "earthquake-cases":
+                    return `
+                        <div class="bg-rose-50 border-2 border-[#023047] rounded-2xl p-3.5">
+                            <div class="font-black text-xs sm:text-sm text-[#023047] mb-2 flex items-center justify-between">
+                                <span>🔔 互動地震波與預警模擬（點擊觸發地震測試）</span>
+                                <button onclick="trigger3DEarthquakeEffect()" class="toy-btn bg-rose-500 hover:bg-rose-400 text-white text-xs px-3 py-1 rounded-xl border-2 border-[#023047] flex items-center gap-1">
+                                    <i class="ph-bold ph-vibrate"></i> 震動 3D 小島
+                                </button>
+                            </div>
+                            <p class="text-xs text-slate-700">點擊上方按鈕可觀察 3D 地震島的震央波紋擴散！在現實中，地震儀偵測到較快的初波（P波）後，預警系統可在破壞力強的次波（S波）及表面波抵達前數秒至數十秒自動煞停高速列車並發送手機警報。</p>
+                        </div>
+                    `;
+
+                case "volcano-cases":
+                    return `
+                        <div class="bg-amber-50 border-2 border-[#023047] rounded-2xl p-3.5">
+                            <div class="font-black text-xs sm:text-sm text-[#023047] mb-2 flex items-center justify-between">
+                                <span>🌋 岩漿黏稠度與爆發類型對比器</span>
+                                <button onclick="trigger3DVolcanoEffect()" class="toy-btn bg-orange-500 hover:bg-orange-400 text-white text-xs px-3 py-1 rounded-xl border-2 border-[#023047] flex items-center gap-1">
+                                    <i class="ph-bold ph-fire"></i> 噴發 3D 火山
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="bg-white border border-slate-300 rounded-xl p-2">
+                                    <div class="font-bold text-rose-700">酸性熔岩 (聚合邊界)</div>
+                                    <p class="text-slate-600 text-[11px] mt-0.5">二氧化硅含量高 → 黏稠度高、流速慢 → 氣體困住積聚高壓 → <strong>猛烈爆炸、高聳複合火山錐</strong>。</p>
+                                </div>
+                                <div class="bg-white border border-slate-300 rounded-xl p-2">
+                                    <div class="font-bold text-amber-700">基性熔岩 (張裂/熱點)</div>
+                                    <p class="text-slate-600 text-[11px] mt-0.5">鐵鎂含量高、硅少 → 黏稠度低、流動快 → 氣體易逸出 → <strong>溫和噴發、廣闊平緩盾狀火山</strong>。</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                case "tsunami-simulator":
+                    return `
+                        <div class="bg-sky-50 border-2 border-[#023047] rounded-2xl p-3.5">
+                            <div class="font-black text-xs sm:text-sm text-[#023047] mb-2 flex items-center justify-between">
+                                <span>🌊 海嘯波高與水深模擬器（點擊切換位置）</span>
+                                <button onclick="trigger3DTsunamiEffect()" class="toy-btn bg-sky-500 hover:bg-sky-400 text-white text-xs px-2.5 py-1 rounded-xl border-2 border-[#023047]">模擬巨浪推進</button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1.5 mb-2.5 text-xs font-bold">
+                                <button onclick="updateTsunamiSimUI('deep')" id="tsu-btn-deep" class="border-2 border-[#023047] rounded-xl py-1.5 bg-white">1. 深海大洋</button>
+                                <button onclick="updateTsunamiSimUI('shallow')" id="tsu-btn-shallow" class="border-2 border-[#023047] rounded-xl py-1.5 bg-white">2. 沿岸淺水區</button>
+                                <button onclick="updateTsunamiSimUI('bay')" id="tsu-btn-bay" class="border-2 border-[#023047] rounded-xl py-1.5 bg-white">3. 紅樹林緩衝岸</button>
+                            </div>
+                            <div id="tsunami-sim-display" class="bg-white border-2 border-[#023047] rounded-xl p-2.5 text-xs"></div>
+                        </div>
+                    `;
+
+                case "ldc-analyzer":
+                    return `
+                        <div class="bg-purple-50 border-2 border-[#023047] rounded-2xl p-3.5 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-[#023047] flex items-center gap-1">
+                                    <i class="ph-fill ph-chart-bar text-purple-600 text-base"></i>
+                                    互動活動：分析欠發達國家 (LDCs) 災情模擬器
+                                </span>
+                                <div class="flex gap-1">
+                                    <button onclick="setLdcPreset('ldc')" class="text-[11px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-lg border border-[#023047]">海地/厄瓜多爾模式</button>
+                                    <button onclick="setLdcPreset('mdc')" class="text-[11px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-lg border border-[#023047]">日本/智利模式</button>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-slate-600">假設發生一場<strong>黎克特震級 7.5 級淺層地震</strong>，試調整以下社會經濟指標，觀察對傷亡及受災程度的影響：</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs bg-white p-2.5 rounded-xl border-2 border-[#023047]">
+                                <div>
+                                    <div class="flex justify-between font-bold mb-0.5"><span>💰 資金與科研投入 (GDP)</span><span id="val-gdp">20%</span></div>
+                                    <input type="range" min="5" max="100" value="${ldcFactorsState.gdp}" oninput="onLdcSliderChange('gdp', this.value)" class="w-full accent-purple-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-bold mb-0.5"><span>🏢 建築物抗震與法規執行</span><span id="val-building">25%</span></div>
+                                    <input type="range" min="5" max="100" value="${ldcFactorsState.building}" oninput="onLdcSliderChange('building', this.value)" class="w-full accent-purple-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-bold mb-0.5"><span>📡 預警系統與運輸網絡</span><span id="val-warning">30%</span></div>
+                                    <input type="range" min="5" max="100" value="${ldcFactorsState.warning}" oninput="onLdcSliderChange('warning', this.value)" class="w-full accent-purple-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-bold mb-0.5"><span>🎓 民眾防災教育與政府效率</span><span id="val-education">25%</span></div>
+                                    <input type="range" min="5" max="100" value="${ldcFactorsState.education}" oninput="onLdcSliderChange('education', this.value)" class="w-full accent-purple-600">
+                                </div>
+                            </div>
+                            <div id="ldc-result-box" class="bg-white border-2 border-[#023047] rounded-xl p-2.5 text-xs"></div>
+
+                            <!-- Interactive Case Study Quiz -->
+                            <div class="border-t-2 border-purple-200 pt-2.5 space-y-2">
+                                <div class="font-black text-xs text-[#023047]">🧠 即時概念診斷：為何欠發達國家受創更深？</div>
+                                ${LDC_QUIZ_SCENARIOS.map(q => `
+                                    <div class="bg-white border-2 border-[#023047] rounded-xl p-2.5 space-y-1.5">
+                                        <div class="font-bold text-xs text-[#023047]">${q.question}</div>
+                                        <div class="space-y-1">
+                                            ${q.options.map((opt, oIdx) => `
+                                                <button onclick="answerLdcQuiz('${q.id}', ${oIdx})" class="w-full text-left text-[11px] p-1.5 rounded-lg border border-slate-300 hover:bg-purple-50 transition flex items-start gap-1.5">
+                                                    <span class="font-medium text-slate-700">${opt.text}</span>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+                                        <div id="quiz-feedback-${q.id}" class="hidden text-[11px] p-2 rounded-lg font-medium"></div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+
+                case "persuasion-game":
+                    return renderPersuasionGameHTML();
+
+                default:
+                    return "";
+            }
+        }
+
+        // Helper for Island 1 Earth Layers
+        function showEarthLayerInfo(layer) {
+            const box = document.getElementById('earth-layer-detail');
+            if (!box) return;
+            const infoMap = {
+                crust: "<strong>【1. 地殼 Crust】</strong> 最薄的外層（固態，主要由二氧化硅組成，平均密度 2.7 g/cm³）。分為厚而輕的大陸地殼（25–70 km）與薄而重的大洋地殼（6–8 km）。",
+                litho: "<strong>【2. 岩石圈 Lithosphere】</strong> 由「地殼 + 固態地幔最上層」組成（厚 100–200 km）。斷裂成多塊構造板塊，是構造作用與地震發生的主要剛性圈層。",
+                astheno: "<strong>【3. 軟流圈 Asthenosphere】</strong> 位於岩石圈之下（深約 100–350 km，溫度 1,000°C–3,500°C）。岩石處於高溫高壓下呈固態但具黏稠塑性，地幔對流在此驅動板塊移動。",
+                core: "<strong>【4. 地核 Core】</strong> 厚達 3,470 km（直徑 6,940 km），富含鐵和鎳，密度最高（11 g/cm³），溫度高達 5,500°C。外地核因高溫熔融呈液態；內地核因極端高壓呈固態。"
+            };
+            box.innerHTML = infoMap[layer] || "";
+        }
+
+        // Helper for Island 2 Boundary Simulator
+        function updateBoundarySimUI(key) {
+            currentBoundaryKey = key;
+            const data = BOUNDARY_SIM_DATA[key];
+            if (!data) return;
+
+            document.querySelectorAll('.sim-tab-btn').forEach(btn => {
+                btn.classList.remove('bg-[#023047]', 'text-amber-300');
+                btn.classList.add('bg-white', 'text-[#023047]');
+            });
+            const activeBtn = document.getElementById(`sim-btn-${key}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-white', 'text-[#023047]');
+                activeBtn.classList.add('bg-[#023047]', 'text-amber-300');
+            }
+
+            const display = document.getElementById('boundary-sim-display');
+            if (!display) return;
+
+            display.innerHTML = `
+                <div class="space-y-2 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-200 pb-1.5">
+                        <span class="font-black text-sm text-[#023047]">${data.title}</span>
+                        <span class="bg-orange-100 text-orange-800 font-bold px-2 py-0.5 rounded-full text-[11px] border border-orange-300">${data.force}</span>
+                    </div>
+                    <!-- Dynamic Cross-section SVG Diagram -->
+                    <div class="w-full bg-sky-50 rounded-xl border-2 border-[#023047] overflow-hidden p-2">
+                        ${getBoundaryDiagramSVG(data.svgType)}
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                        <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                            <span class="font-bold text-slate-500 block">板塊實例：</span>
+                            <span class="font-bold text-[#023047]">${data.plates}</span>
+                        </div>
+                        <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                            <span class="font-bold text-slate-500 block">主要內部作用：</span>
+                            <span class="font-bold text-[#023047]">${data.processes}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="font-bold text-slate-600 text-[11px]">形成地貌：</span>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            ${data.landforms.map(lf => `<span class="bg-amber-100 text-[#023047] border border-[#023047] font-bold px-2 py-0.5 rounded-lg text-[11px]">${lf}</span>`).join('')}
+                        </div>
+                    </div>
+                    <p class="text-slate-700 leading-relaxed pt-1">${data.desc}</p>
+                </div>
+            `;
+        }
+
+        function getBoundaryDiagramSVG(type) {
+            if (type === "div-ocean") {
+                return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <rect x="0" y="10" width="360" height="45" fill="#7DD3FC"/>
+                    <path d="M0,55 L135,45 L165,30 L180,42 L195,30 L225,45 L360,55 L360,80 L0,80 Z" fill="#94A3B8" stroke="#023047" stroke-width="2"/>
+                    <rect x="0" y="75" width="360" height="35" fill="#EA580C"/>
+                    <path d="M172,110 L176,40 L184,40 L188,110 Z" fill="#FACC15"/>
+                    <text x="180" y="22" text-anchor="middle" font-size="10" font-weight="bold" fill="#023047">大洋中脊與中央裂谷</text>
+                    <text x="65" y="68" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFF">← 板塊背離</text>
+                    <text x="295" y="68" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFF">板塊背離 →</text>
+                    <text x="180" y="100" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">軟流圈岩漿上湧 (脊推)</text>
+                </svg>`;
+            }
+            if (type === "div-land") {
+                return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <path d="M0,30 L115,30 L135,55 L225,55 L245,30 L360,30 L360,78 L0,78 Z" fill="#D97706" stroke="#023047" stroke-width="2"/>
+                    <rect x="137" y="47" width="86" height="8" fill="#38BDF8"/>
+                    <polygon points="195,55 208,35 221,55" fill="#78350F" stroke="#023047" stroke-width="1.5"/>
+                    <rect x="0" y="78" width="360" height="32" fill="#EA580C"/>
+                    <text x="175" y="22" text-anchor="middle" font-size="10" font-weight="bold" fill="#023047">東非大裂谷 (正斷層下陷) + 火山</text>
+                    <text x="60" y="58" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFF">← 努比亞板塊</text>
+                    <text x="300" y="58" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFF">索馬里板塊 →</text>
+                </svg>`;
+            }
+            if (type === "conv-oc") {
+                return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <rect x="0" y="35" width="175" height="25" fill="#38BDF8"/>
+                    <rect x="0" y="68" width="360" height="42" fill="#EA580C"/>
+                    <path d="M0,55 L165,55 L235,108 L205,108 L150,70 L0,70 Z" fill="#64748B" stroke="#023047" stroke-width="2"/>
+                    <path d="M165,58 L195,28 L225,14 L255,28 L280,12 L315,32 L360,32 L360,72 L185,72 Z" fill="#B45309" stroke="#023047" stroke-width="2"/>
+                    <circle cx="225" cy="10" r="5" fill="#EF4444"/>
+                    <text x="155" y="30" text-anchor="middle" font-size="10" font-weight="bold" fill="#023047">海溝</text>
+                    <text x="268" y="25" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">褶曲山脈 + 火山</text>
+                    <text x="75" y="66" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">大洋板塊俯衝 ↘</text>
+                </svg>`;
+            }
+            if (type === "conv-oo") {
+                return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <rect x="0" y="32" width="360" height="30" fill="#38BDF8"/>
+                    <rect x="0" y="68" width="360" height="42" fill="#EA580C"/>
+                    <path d="M0,55 L160,55 L230,108 L200,108 L145,70 L0,70 Z" fill="#475569" stroke="#023047" stroke-width="2"/>
+                    <path d="M165,58 L360,58 L360,72 L180,72 Z" fill="#64748B" stroke="#023047" stroke-width="2"/>
+                    <polygon points="215,58 232,20 250,58" fill="#15803D" stroke="#023047" stroke-width="2"/>
+                    <polygon points="260,58 275,24 290,58" fill="#15803D" stroke="#023047" stroke-width="2"/>
+                    <text x="160" y="25" text-anchor="middle" font-size="10" font-weight="bold" fill="#023047">深海溝</text>
+                    <text x="255" y="15" text-anchor="middle" font-size="10" font-weight="bold" fill="#023047">火山島弧 (日本/印尼)</text>
+                </svg>`;
+            }
+            if (type === "conv-cc") {
+                return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <rect x="0" y="75" width="360" height="35" fill="#EA580C"/>
+                    <path d="M0,42 L120,42 L155,15 L185,8 L215,18 L255,25 L360,25 L360,82 L210,88 L140,85 L0,75 Z" fill="#D97706" stroke="#023047" stroke-width="2"/>
+                    <text x="185" y="28" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">喜馬拉雅褶曲山脈 (無活火山)</text>
+                    <text x="65" y="62" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">印度次大陸 →</text>
+                    <text x="300" y="58" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFF">← 亞洲大陸</text>
+                </svg>`;
+            }
+            return `
+                <svg viewBox="0 0 360 110" class="w-full h-24">
+                    <rect x="0" y="75" width="360" height="35" fill="#EA580C"/>
+                    <polygon points="20,35 178,35 178,75 20,75" fill="#10B981" stroke="#023047" stroke-width="2"/>
+                    <polygon points="182,25 340,25 340,75 182,75" fill="#F59E0B" stroke="#023047" stroke-width="2"/>
+                    <line x1="180" y1="15" x2="180" y2="85" stroke="#EF4444" stroke-width="4" stroke-dasharray="4 2"/>
+                    <text x="100" y="58" text-anchor="middle" font-size="11" font-weight="bold" fill="#023047">太平洋板塊 ↗</text>
+                    <text x="260" y="52" text-anchor="middle" font-size="11" font-weight="bold" fill="#023047">↙ 北美洲板塊</text>
+                    <text x="180" y="13" text-anchor="middle" font-size="10" font-weight="bold" fill="#B91C1C">聖安德烈亞斯轉換斷層 (剪切力)</text>
+                </svg>`;
+        }
+
+        // Helper for Island 5 Tsunami Simulator
+        function updateTsunamiSimUI(mode) {
+            tsunamiDepthMode = mode;
+            ['deep', 'shallow', 'bay'].forEach(m => {
+                const btn = document.getElementById(`tsu-btn-${m}`);
+                if (btn) {
+                    btn.className = m === mode
+                        ? 'border-2 border-[#023047] rounded-xl py-1.5 bg-[#023047] text-amber-300 font-bold'
+                        : 'border-2 border-[#023047] rounded-xl py-1.5 bg-white text-[#023047] font-bold';
+                }
+            });
+            const box = document.getElementById('tsunami-sim-display');
+            if (!box) return;
+            const map = {
+                deep: {
+                    speed: "約 700–800 km/h（如噴射客機）",
+                    wavelength: "極長（可超過 100–200 公里）",
+                    height: "僅約 0.5 至 1 米高",
+                    risk: "低（在廣闊外海航行的船隻幾乎察覺不到海嘯經過）"
+                },
+                shallow: {
+                    speed: "驟減至 40–60 km/h",
+                    wavelength: "急劇縮短（前浪受海牀摩擦減速，後浪湧上擠壓）",
+                    height: "暴增至 10 至 30 米以上水牆！",
+                    risk: "極高（低窪海岸與狹窄海灣將承受毀滅性淹浸與衝擊）"
+                },
+                bay: {
+                    speed: "受 100–400 米闊紅樹林/防潮林帶阻擋大幅減速",
+                    wavelength: "波浪能量被樹幹與儲水渠道分散吸收",
+                    height: "可消減高達 90% 海嘯能量",
+                    risk: "顯著降低（配合高地疏散路線與海嘯疏散塔，大幅減少村落傷亡）"
+                }
+            };
+            const d = map[mode];
+            box.innerHTML = `
+                <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+                    <div class="bg-sky-50 p-1.5 rounded-lg border border-sky-200"><span class="text-slate-500 block text-[10px]">移動速度</span><strong class="text-[#023047]">${d.speed}</strong></div>
+                    <div class="bg-sky-50 p-1.5 rounded-lg border border-sky-200"><span class="text-slate-500 block text-[10px]">預計波高</span><strong class="text-rose-600">${d.height}</strong></div>
+                </div>
+                <p class="text-slate-700"><strong>波長與機制：</strong>${d.wavelength}</p>
+                <p class="text-[#023047] font-bold mt-1">📊 破壞評估：${d.risk}</p>
+            `;
+        }
+
+        // Helper for Island 6 LDC Vulnerability Analyzer
+        function onLdcSliderChange(field, val) {
+            ldcFactorsState[field] = parseInt(val, 10);
+            const label = document.getElementById(`val-${field}`);
+            if (label) label.textContent = `${val}%`;
+            updateLdcAnalyzerUI();
+        }
+
+        function setLdcPreset(type) {
+            if (type === 'ldc') {
+                ldcFactorsState = { gdp: 15, building: 20, warning: 25, education: 20 };
+            } else {
+                ldcFactorsState = { gdp: 88, building: 92, warning: 90, education: 85 };
+            }
+            renderDrawerContent(6);
+        }
+
+        function updateLdcAnalyzerUI() {
+            const box = document.getElementById('ldc-result-box');
+            if (!box) return;
+            const avgResilience = Math.round((ldcFactorsState.gdp + ldcFactorsState.building + ldcFactorsState.warning + ldcFactorsState.education) / 4);
+            const vulnerability = 100 - avgResilience;
+
+            let levelBadge = "";
+            let analysisText = "";
+            if (vulnerability >= 60) {
+                levelBadge = `<span class="bg-rose-600 text-white px-2.5 py-0.5 rounded-full font-bold">極高脆弱度 (${vulnerability}/100) — 典型欠發達國家災情</span>`;
+                analysisText = `由於<strong>缺乏資金與科研投入</strong>，磚石房屋無抗震結構極易倒塌；加上<strong>運輸與通訊落後</strong>阻礙救援、民眾缺乏演習及政府效率低，同級地震下傷亡人數將比發達國家高出數十倍（如 2010 海地及 2016 厄瓜多爾地震）。`;
+            } else if (vulnerability >= 30) {
+                levelBadge = `<span class="bg-amber-500 text-white px-2.5 py-0.5 rounded-full font-bold">中等脆弱度 (${vulnerability}/100) — 積極改革發展中國家</span>`;
+                analysisText = `類似<strong>墨西哥模式</strong>：雖然資金有限，但透過建立地震預警系統 (SASMEX)、收緊大城市建築規例及定期舉行全民演習，能顯著降低死亡人數。`;
+            } else {
+                levelBadge = `<span class="bg-emerald-600 text-white px-2.5 py-0.5 rounded-full font-bold">高抵禦能力 (脆弱度僅 ${vulnerability}/100) — 較發達國家</span>`;
+                analysisText = `類似<strong>日本或智利模式</strong>：充足科研資金（佔 GDP >3%）、普及的抗震鋼骨建築、自動化預警系統與高效救援隊，將人命傷亡減至最低（但因昂貴基建密集，絕對經濟財物損失仍可能頗高）。`;
+            }
+
+            box.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                    <span class="font-bold text-[#023047]">綜合災害脆弱度評估：</span>
+                    ${levelBadge}
+                </div>
+                <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden border border-[#023047] mb-2">
+                    <div class="h-full transition-all duration-300 ${vulnerability >= 60 ? 'bg-rose-500' : vulnerability >= 30 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width: ${vulnerability}%"></div>
+                </div>
+                <p class="text-slate-700 leading-relaxed">${analysisText}</p>
+            `;
+        }
+
+        function answerLdcQuiz(qId, optIdx) {
+            const q = LDC_QUIZ_SCENARIOS.find(item => item.id === qId);
+            if (!q) return;
+            const opt = q.options[optIdx];
+            const fb = document.getElementById(`quiz-feedback-${qId}`);
+            if (!fb) return;
+            fb.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-900', 'bg-rose-100', 'text-rose-900');
+            if (opt.correct) {
+                fb.classList.add('bg-emerald-100', 'text-emerald-900');
+                fb.innerHTML = `✅ ${opt.feedback}`;
+            } else {
+                fb.classList.add('bg-rose-100', 'text-rose-900');
+                fb.innerHTML = `❌ ${opt.feedback}`;
+            }
+        }
+
+        // Helper for Island 7 Persuasion Roleplay Activity
+        function renderPersuasionGameHTML() {
+            const persuadedCount = PERSUASION_RESIDENTS.filter(r => r.trust >= 80).length;
+            return `
+                <div class="bg-pink-50 border-2 border-[#023047] rounded-2xl p-3.5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-black text-xs sm:text-sm text-[#023047] flex items-center gap-1">
+                                <i class="ph-fill ph-megaphone text-pink-600 text-base"></i>
+                                互動任務：說服高危災區居民安全撤離！
+                            </span>
+                            <p class="text-[11px] text-slate-600">火山與海嘯警報已響起！請針對三位不同背景居民的顧慮（生計、成本、風險偏誤），選擇最合理的地理策略說服他們撤離：</p>
+                        </div>
+                        <div class="bg-white border-2 border-[#023047] rounded-xl px-2.5 py-1 text-center shrink-0">
+                            <div class="text-[10px] font-bold text-slate-500">已說服居民</div>
+                            <div class="font-brand font-black text-sm text-pink-600">${persuadedCount} / 3</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5">
+                        ${PERSUASION_RESIDENTS.map((res, rIdx) => {
+                            const isSuccess = res.trust >= 80;
+                            return `
+                                <div class="bg-white border-2 border-[#023047] rounded-xl p-3 space-y-2">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-2xl bg-amber-100 border border-[#023047] rounded-xl w-10 h-10 flex items-center justify-center shrink-0">${res.avatar}</span>
+                                            <div>
+                                                <div class="font-bold text-xs text-[#023047]">${res.name}</div>
+                                                <div class="text-[10px] text-slate-500 font-medium">${res.role}</div>
+                                            </div>
+                                        </div>
+                                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full border border-[#023047] shrink-0 ${isSuccess ? 'bg-emerald-400 text-[#023047]' : 'bg-amber-200 text-[#023047]'}">
+                                            ${isSuccess ? '✓ 已同意撤離' : `撤離意願 ${res.trust}%`}
+                                        </span>
+                                    </div>
+
+                                    <!-- Resident Stance Bubble -->
+                                    <div class="bg-slate-100 border-l-4 border-[#023047] p-2 rounded-r-lg text-xs text-slate-700 italic">
+                                        ${res.stance}
+                                    </div>
+
+                                    <!-- Persuasion Progress Bar -->
+                                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden border border-slate-400">
+                                        <div class="h-full transition-all duration-300 ${isSuccess ? 'bg-emerald-500' : 'bg-pink-500'}" style="width: ${Math.min(100, Math.max(5, res.trust))}%"></div>
+                                    </div>
+
+                                    <!-- Persuasion Dialogue Options -->
+                                    <div class="space-y-1.5 pt-1">
+                                        <div class="text-[11px] font-bold text-[#023047]">選擇你的說服論點：</div>
+                                        ${res.options.map((opt, oIdx) => `
+                                            <button onclick="applyPersuasionChoice(${rIdx}, ${oIdx})"
+                                                class="w-full text-left text-[11px] p-2 rounded-xl border-2 border-slate-300 hover:border-[#023047] hover:bg-amber-50 transition flex items-start gap-1.5">
+                                                <i class="ph-bold ph-chat-centered-text text-pink-600 shrink-0 mt-0.5"></i>
+                                                <span class="font-medium text-slate-800">${opt.label}</span>
+                                            </button>
+                                        `).join('')}
+                                    </div>
+
+                                    <!-- Reply Box -->
+                                    <div id="persuade-reply-${rIdx}" class="${res.lastReply ? '' : 'hidden'} text-[11px] p-2.5 rounded-xl border-2 ${isSuccess ? 'bg-emerald-50 border-emerald-600 text-emerald-900' : 'bg-rose-50 border-rose-500 text-rose-900'} font-medium">
+                                        ${res.lastReply || ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    ${persuadedCount === 3 ? `
+                        <div class="bg-emerald-400 border-2 border-[#023047] rounded-xl p-3 text-xs font-bold text-[#023047] flex items-center justify-between">
+                            <span>🎉 恭喜完成撤離任務！你已掌握居民考慮去留的四大因素（風險、機會、社會聯繫與限制）！</span>
+                            <button onclick="resetPersuasionGame()" class="bg-white px-2.5 py-1 rounded-lg border border-[#023047] shrink-0">重玩一次</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function applyPersuasionChoice(resIdx, optIdx) {
+            const res = PERSUASION_RESIDENTS[resIdx];
+            const opt = res.options[optIdx];
+            res.trust = Math.min(100, Math.max(5, res.trust + opt.impact));
+            res.lastReply = opt.reply;
+            renderDrawerContent(7);
+        }
+
+        function resetPersuasionGame() {
+            PERSUASION_RESIDENTS[0].trust = 25;
+            PERSUASION_RESIDENTS[1].trust = 30;
+            PERSUASION_RESIDENTS[2].trust = 35;
+            PERSUASION_RESIDENTS.forEach(r => delete r.lastReply);
+            renderDrawerContent(7);
+        }
+
+        /********************************************************************
+         * 5. THREE.JS 3D HEXAGONAL TOY DIORAMA CITY ENGINE
+         ********************************************************************/
+        let scene, camera, renderer, raycaster, mouse;
+        let islandGroups = [];
+        let selectableMeshes = [];
+        let cloudsGroup, boatsGroup, animatedProps = [];
+        let shakeTimer = 0, volcanoBurstTimer = 0, tsunamiWaveTimer = 0;
+
+        // Smooth Camera Orbit & Target State
+        let camState = {
+            theta: 0.55,
+            phi: 0.85,
+            radius: 28,
+            targetTheta: 0.55,
+            targetPhi: 0.85,
+            targetRadius: 28,
+            lookAt: new THREE.Vector3(0, 0, 0),
+            targetLookAt: new THREE.Vector3(0, 0, 0)
+        };
+
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let pointerMovedDistance = 0;
+        let pinchStartDist = 0;
+
+        function init3DScene() {
+            const container = document.getElementById('canvas-container');
+            const canvas = document.getElementById('three-canvas');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xD8EFF8);
+            scene.fog = new THREE.FogExp2(0xD8EFF8, 0.012);
+
+            camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 200);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Warm Toy City Lighting
+            const hemiLight = new THREE.HemisphereLight(0xFFFDF5, 0x7EC8E3, 0.85);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xFFF3D1, 0.95);
+            dirLight.position.set(18, 32, 22);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 5;
+            dirLight.shadow.camera.far = 80;
+            const d = 24;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            dirLight.shadow.bias = -0.0005;
+            scene.add(dirLight);
+
+            // Toy Ocean Table Base
+            const seaGeo = new THREE.CylinderGeometry(48, 48, 2, 64);
+            const seaMat = new THREE.MeshPhongMaterial({
+                color: 0x38BDF8,
+                shininess: 65,
+                specular: 0xbae6fd
+            });
+            const seaMesh = new THREE.Mesh(seaGeo, seaMat);
+            seaMesh.position.y = -1.6;
+            seaMesh.receiveShadow = true;
+            scene.add(seaMesh);
+
+            // Build the 7 Hexagonal Diorama Islands
+            ISLANDS_DATA.forEach(islandData => {
+                createHexIslandDiorama(islandData);
+            });
+
+            // Build Connecting Toy Bridges & Boats & Clouds
+            createConnectingBridges();
+            createToyCloudsAndBoats();
+            createHTMLFloatingLabels();
+
+            // Adjust initial camera for mobile vs desktop
+            if (window.innerWidth < 768) {
+                camState.radius = 34;
+                camState.targetRadius = 34;
+            }
+            focusCameraOnIsland(1);
+
+            // Input Listeners
+            setup3DInteractionListeners(canvas);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Helper to create tactile toy materials
+        function toyMat(hexColor, flat = true) {
+            return new THREE.MeshLambertMaterial({ color: hexColor, flatShading: flat });
+        }
+
+        function createHexIslandDiorama(data) {
+            const group = new THREE.Group();
+            group.position.set(data.pos.x, 0, data.pos.z);
+            group.userData = { islandId: data.id };
+
+            const hexRadius = 4.6;
+
+            // 1. Sub-crust Lithosphere/Asthenosphere Base Layer
+            const magmaGeo = new THREE.CylinderGeometry(hexRadius * 0.96, hexRadius * 0.85, 0.8, 6);
+            const magmaMesh = new THREE.Mesh(magmaGeo, toyMat(0xEA580C));
+            magmaMesh.position.y = -0.5;
+            magmaMesh.castShadow = true;
+            magmaMesh.receiveShadow = true;
+            group.add(magmaMesh);
+
+            // 2. Main Hexagonal Soil/Rock Rim
+            const soilGeo = new THREE.CylinderGeometry(hexRadius, hexRadius * 0.96, 1.0, 6);
+            const soilMesh = new THREE.Mesh(soilGeo, toyMat(0xB45309));
+            soilMesh.position.y = 0.2;
+            soilMesh.castShadow = true;
+            soilMesh.receiveShadow = true;
+            soilMesh.userData = { islandId: data.id };
+            group.add(soilMesh);
+            selectableMeshes.push(soilMesh);
+
+            // 3. Top Turf / Theme Cap
+            const topColors = {
+                1: 0x34D399, // Emerald green
+                2: 0xFBBF24, // Ochre mountain
+                3: 0x94A3B8, // Urban concrete
+                4: 0x78350F, // Volcanic basalt
+                5: 0xFDE047, // Sandy beach coast
+                6: 0xC084FC, // Contrast purple/sand
+                7: 0x4ADE80  // Lush terrace green
+            };
+            const topGeo = new THREE.CylinderGeometry(hexRadius * 0.96, hexRadius, 0.4, 6);
+            const topMesh = new THREE.Mesh(topGeo, toyMat(topColors[data.id]));
+            topMesh.position.y = 0.85;
+            topMesh.receiveShadow = true;
+            topMesh.castShadow = true;
+            topMesh.userData = { islandId: data.id };
+            group.add(topMesh);
+            selectableMeshes.push(topMesh);
+
+            // 4. Selection Ring Highlight
+            const ringGeo = new THREE.RingGeometry(hexRadius * 1.02, hexRadius * 1.12, 6);
+            ringGeo.rotateX(-Math.PI / 2);
+            ringGeo.rotateY(Math.PI / 6);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xFACC15, side: THREE.DoubleSide });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.position.y = -0.35;
+            ringMesh.visible = (data.id === 1);
+            group.add(ringMesh);
+            group.userData.ringMesh = ringMesh;
+
+            // 5. Populate Unique Miniature Toy Diorama Models per Island
+            buildIslandSpecificModels(group, data.id);
+
+            scene.add(group);
+            islandGroups.push(group);
+        }
+
+        function buildIslandSpecificModels(group, id) {
+            const baseH = 1.05;
+
+            if (id === 1) {
+                // ISLAND 1: Plate Tectonics Globe & Split Plates Diorama
+                const domeGroup = new THREE.Group();
+                domeGroup.position.set(0, baseH, 0);
+
+                // Outer Earth Crust Dome
+                const crustGeo = new THREE.SphereGeometry(1.75, 16, 12, 0, Math.PI * 1.5);
+                const crustMesh = new THREE.Mesh(crustGeo, toyMat(0x2563EB));
+                crustMesh.position.y = 1.2;
+                crustMesh.castShadow = true;
+                domeGroup.add(crustMesh);
+
+                // Mantle Layer Inside Cutaway
+                const mantleGeo = new THREE.SphereGeometry(1.4, 16, 12);
+                const mantleMesh = new THREE.Mesh(mantleGeo, toyMat(0xF97316));
+                mantleMesh.position.y = 1.2;
+                domeGroup.add(mantleMesh);
+
+                // Inner Core Glowing Sphere
+                const coreGeo = new THREE.SphereGeometry(0.75, 12, 12);
+                const coreMesh = new THREE.Mesh(coreGeo, toyMat(0xFDE047));
+                coreMesh.position.set(0.3, 1.2, 0.3);
+                domeGroup.add(coreMesh);
+
+                // Toy Compass Pedestal & Trees
+                const pedGeo = new THREE.CylinderGeometry(2.2, 2.5, 0.4, 12);
+                const pedMesh = new THREE.Mesh(pedGeo, toyMat(0xF8FAFC));
+                pedMesh.position.y = 0.2;
+                domeGroup.add(pedMesh);
+
+                addToyTree(group, -2.5, baseH, 1.5, 1.1);
+                addToyTree(group, 2.6, baseH, -1.2, 0.9);
+                addToyTree(group, -1.8, baseH, -2.2, 1.0);
+
+                group.add(domeGroup);
+                animatedProps.push({ mesh: domeGroup, type: 'rotateY', speed: 0.006 });
+
+            } else if (id === 2) {
+                // ISLAND 2: Fold Mountains (Himalayas/Andes) + Rift Valley + Ocean Trench
+                // Fold Mountain Peaks
+                const m1 = new THREE.Mesh(new THREE.ConeGeometry(1.6, 3.2, 6), toyMat(0x78350F));
+                m1.position.set(-1.3, baseH + 1.6, -0.8);
+                m1.castShadow = true;
+                group.add(m1);
+
+                // Snow Cap 1
+                const s1 = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.3, 6), toyMat(0xFFFFFF));
+                s1.position.set(-1.3, baseH + 2.6, -0.8);
+                group.add(s1);
+
+                const m2 = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.5, 6), toyMat(0x92400E));
+                m2.position.set(0.5, baseH + 1.25, -1.5);
+                m2.castShadow = true;
+                group.add(m2);
+
+                const s2 = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.0, 6), toyMat(0xFFFFFF));
+                s2.position.set(0.5, baseH + 2.05, -1.5);
+                group.add(s2);
+
+                // Rift Valley Block Graben on front side
+                const blockL = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 2.2), toyMat(0xD97706));
+                blockL.position.set(-1.2, baseH + 0.55, 1.5);
+                blockL.castShadow = true;
+                group.add(blockL);
+
+                const blockR = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 2.2), toyMat(0xD97706));
+                blockR.position.set(1.5, baseH + 0.55, 1.5);
+                blockR.castShadow = true;
+                group.add(blockR);
+
+                // Sunken Rift River
+                const riftWater = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.3, 2.2), toyMat(0x0284C7));
+                riftWater.position.set(0.15, baseH + 0.15, 1.5);
+                group.add(riftWater);
+
+                addToyTree(group, 2.2, baseH + 1.1, 1.2, 0.8);
+                addToyTree(group, -1.5, baseH + 1.1, 1.8, 0.85);
+
+            } else if (id === 3) {
+                // ISLAND 3: Earthquake City (Seismograph Tower, Tilted Building, Fault Line, Shinkansen Train)
+                const quakeGroup = new THREE.Group();
+                quakeGroup.position.set(0, baseH, 0);
+
+                // Red Fault Crack Line
+                const crack = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.12, 0.45), toyMat(0xDC2626));
+                crack.rotation.y = 0.4;
+                crack.position.y = 0.05;
+                quakeGroup.add(crack);
+
+                // Anti-seismic Pyramid Skyscraper (like Burj Khalifa / X-braced tower)
+                const safeTower = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 1.0, 3.4, 6), toyMat(0x0284C7));
+                safeTower.position.set(-1.4, 1.7, -0.8);
+                safeTower.castShadow = true;
+                quakeGroup.add(safeTower);
+
+                // Tilted Damaged Building on Fault
+                const tiltedBldg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 1.2), toyMat(0xE2E8F0));
+                tiltedBldg.position.set(1.3, 1.0, 0.7);
+                tiltedBldg.rotation.z = -0.22;
+                tiltedBldg.rotation.x = 0.12;
+                tiltedBldg.castShadow = true;
+                quakeGroup.add(tiltedBldg);
+
+                // Epicentre Pulsing Beacon
+                const beaconGeo = new THREE.RingGeometry(0.4, 0.7, 24);
+                beaconGeo.rotateX(-Math.PI / 2);
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xEF4444, side: THREE.DoubleSide });
+                const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+                beacon.position.set(0.2, 0.15, 0.2);
+                quakeGroup.add(beacon);
+                animatedProps.push({ mesh: beacon, type: 'pulseScale', speed: 0.06 });
+
+                // Toy High Speed Train Track & Shinkansen
+                const track = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.2, 0.5), toyMat(0xF8FAFC));
+                track.position.set(0, 0.2, -1.9);
+                quakeGroup.add(track);
+                const train = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 0.35), toyMat(0x10B981));
+                train.position.set(-0.5, 0.45, -1.9);
+                quakeGroup.add(train);
+
+                group.add(quakeGroup);
+                group.userData.quakeGroup = quakeGroup;
+
+            } else if (id === 4) {
+                // ISLAND 4: Volcano Eruption Island ( Stratovolcano, glowing crater, lava flow & diversion barrier)
+                const volcCone = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 2.8, 3.2, 12), toyMat(0x451A03));
+                volcCone.position.set(-0.3, baseH + 1.6, -0.3);
+                volcCone.castShadow = true;
+                group.add(volcCone);
+
+                // Glowing Crater Lava
+                const craterLava = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 12), toyMat(0xFF4500));
+                craterLava.position.set(-0.3, baseH + 3.15, -0.3);
+                group.add(craterLava);
+
+                // Lava Stream Flowing Down
+                const lavaStream = new THREE.Mesh(new THREE.BoxGeometry(0.65, 3.1, 0.3), toyMat(0xFB8500));
+                lavaStream.position.set(0.7, baseH + 1.4, 0.6);
+                lavaStream.rotation.z = 0.52;
+                lavaStream.rotation.y = -0.6;
+                group.add(lavaStream);
+
+                // Lava Diversion Wall protecting a miniature village house
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.55, 0.35), toyMat(0x94A3B8));
+                wall.position.set(1.5, baseH + 0.28, 1.5);
+                wall.rotation.y = 0.6;
+                wall.castShadow = true;
+                group.add(wall);
+
+                addToyHouse(group, 2.1, baseH, 2.2, 0xFDE047, 0xDC2626);
+
+                // Floating Ash Smoke Puffs
+                const smokeGroup = new THREE.Group();
+                for (let i = 0; i < 3; i++) {
+                    const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45 + i * 0.15, 1), toyMat(0xCBD5E1));
+                    puff.position.set(-0.3 + i * 0.25, baseH + 3.7 + i * 0.65, -0.3 - i * 0.15);
+                    smokeGroup.add(puff);
+                }
+                group.add(smokeGroup);
+                group.userData.smokeGroup = smokeGroup;
+                animatedProps.push({ mesh: smokeGroup, type: 'bobY', baseY: 0, speed: 0.04 });
+
+            } else if (id === 5) {
+                // ISLAND 5: Tsunami Island (Giant Blue Wave, DART Buoy, Sea Wall, Mangrove Belt & Evacuation Tower)
+                // Giant Stylized Toy Tsunami Wave
+                const waveGroup = new THREE.Group();
+                const waveBody = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.4, 3.8, 12, 1, false, 0, Math.PI), toyMat(0x0284C7));
+                waveBody.rotation.z = Math.PI / 2;
+                waveBody.rotation.y = 0.3;
+                waveBody.position.set(0, baseH + 1.1, 2.1);
+                waveBody.castShadow = true;
+                waveGroup.add(waveBody);
+
+                const waveCrest = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.35, 0.6), toyMat(0xFFFFFF));
+                waveCrest.position.set(0, baseH + 2.0, 1.65);
+                waveCrest.rotation.y = 0.3;
+                waveGroup.add(waveCrest);
+                group.add(waveGroup);
+                group.userData.waveGroup = waveGroup;
+                animatedProps.push({ mesh: waveGroup, type: 'waveSurge', speed: 0.045 });
+
+                // Coastal Sea Wall
+                const seaWall = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.65, 0.4), toyMat(0x94A3B8));
+                seaWall.position.set(-0.2, baseH + 0.32, 0.2);
+                seaWall.castShadow = true;
+                group.add(seaWall);
+
+                // Mangrove Forest Buffer Belt
+                addToyTree(group, -1.6, baseH, 0.8, 0.75);
+                addToyTree(group, -0.5, baseH, 0.85, 0.8);
+                addToyTree(group, 0.6, baseH, 0.8, 0.75);
+
+                // Vertical Tsunami Evacuation Tower on High Ground
+                const evacTower = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.4, 1.1), toyMat(0x10B981));
+                evacTower.position.set(-1.2, baseH + 1.2, -1.6);
+                evacTower.castShadow = true;
+                group.add(evacTower);
+
+                // DART Tsunami Warning Buoy
+                const buoy = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.9, 8), toyMat(0xFACC15));
+                buoy.position.set(2.4, baseH + 0.45, 1.8);
+                group.add(buoy);
+
+            } else if (id === 6) {
+                // ISLAND 6: Vulnerability Factors (MDC Modern Resistant Side vs LDC Fragile Side)
+                // Divider Line
+                const divider = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 6.5), toyMat(0x023047));
+                divider.position.set(0, baseH + 0.1, 0);
+                group.add(divider);
+
+                // Left Side: MDC Modern Steel Skyscraper + Satellite Dish
+                const mdcTower = new THREE.Mesh(new THREE.BoxGeometry(1.4, 3.0, 1.4), toyMat(0x38BDF8));
+                mdcTower.position.set(-1.6, baseH + 1.5, -0.6);
+                mdcTower.castShadow = true;
+                group.add(mdcTower);
+
+                const radar = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.5, 10), toyMat(0xFFFFFF));
+                radar.position.set(-1.6, baseH + 3.25, -0.6);
+                radar.rotation.x = 0.5;
+                group.add(radar);
+
+                // Right Side: LDC Dense Fragile Brick Shacks & Relief Tent
+                addToyHouse(group, 1.4, baseH, -1.1, 0xD97706, 0x78350F);
+                addToyHouse(group, 2.2, baseH, 0.2, 0xB45309, 0x78350F);
+                // White Emergency Relief Tent
+                const tent = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.9, 4), toyMat(0xFFFFFF));
+                tent.position.set(1.3, baseH + 0.45, 1.5);
+                tent.rotation.y = Math.PI / 4;
+                group.add(tent);
+
+            } else if (id === 7) {
+                // ISLAND 7: Opportunities vs Risks (Bali Terraces, Hot Spring, Geothermal Turbine & Mining)
+                // Stepped Rice Terraces + Volcano
+                for (let step = 0; step < 3; step++) {
+                    const terrace = new THREE.Mesh(
+                        new THREE.CylinderGeometry(2.2 - step * 0.55, 2.4 - step * 0.55, 0.45, 8),
+                        toyMat(step === 2 ? 0x65A30D : 0x84CC16)
+                    );
+                    terrace.position.set(-0.9, baseH + 0.22 + step * 0.45, -0.8);
+                    terrace.castShadow = true;
+                    group.add(terrace);
+                }
+
+                // Hot Spring Lagoon (Grand Prismatic style)
+                const springRim = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, 0.2, 16), toyMat(0xF97316));
+                springRim.position.set(1.4, baseH + 0.1, 1.1);
+                group.add(springRim);
+
+                const springWater = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.24, 16), toyMat(0x06B6D4));
+                springWater.position.set(1.4, baseH + 0.12, 1.1);
+                group.add(springWater);
+
+                // Geothermal Power Plant Cooling Tower + Wind/Steam Turbine
+                const geoTower = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.7, 1.5, 12), toyMat(0xE2E8F0));
+                geoTower.position.set(1.6, baseH + 0.75, -1.2);
+                geoTower.castShadow = true;
+                group.add(geoTower);
+
+                addToyHouse(group, -1.5, baseH, 1.6, 0xFEF08A, 0xEA580C);
+                addToyTree(group, 0.2, baseH, 2.2, 0.9);
+            }
+
+            // Pickable invisible collider for the whole island top so clicking any toy prop selects the island
+            const hitGeo = new THREE.CylinderGeometry(4.4, 4.4, 4.2, 6);
+            const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+            const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+            hitMesh.position.y = 2.2;
+            hitMesh.userData = { islandId: id };
+            group.add(hitMesh);
+            selectableMeshes.push(hitMesh);
+        }
+
+        function addToyTree(parent, x, y, z, scale = 1) {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * scale, 0.22 * scale, 0.6 * scale, 6), toyMat(0x78350F));
+            trunk.position.set(x, y + 0.3 * scale, z);
+            trunk.castShadow = true;
+            parent.add(trunk);
+
+            const foliage = new THREE.Mesh(new THREE.ConeGeometry(0.65 * scale, 1.3 * scale, 7), toyMat(0x16A34A));
+            foliage.position.set(x, y + 1.05 * scale, z);
+            foliage.castShadow = true;
+            parent.add(foliage);
+        }
+
+        function addToyHouse(parent, x, y, z, wallHex, roofHex) {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.65, 0.85), toyMat(wallHex));
+            wall.position.set(x, y + 0.32, z);
+            wall.castShadow = true;
+            parent.add(wall);
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.55, 4), toyMat(roofHex));
+            roof.position.set(x, y + 0.9, z);
+            roof.rotation.y = Math.PI / 4;
+            roof.castShadow = true;
+            parent.add(roof);
+        }
+
+        function createConnectingBridges() {
+            // Connect center island (0,0) to each outer island with toy wooden piers
+            for (let i = 1; i < ISLANDS_DATA.length; i++) {
+                const target = ISLANDS_DATA[i].pos;
+                const angle = Math.atan2(target.x, target.z);
+                const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 3.2), toyMat(0xF59E0B));
+                bridge.position.set(target.x * 0.5, 0.65, target.z * 0.5);
+                bridge.rotation.y = angle;
+                bridge.castShadow = true;
+                scene.add(bridge);
+            }
+        }
+
+        function createToyCloudsAndBoats() {
+            cloudsGroup = new THREE.Group();
+            const cloudCoords = [
+                { x: -12, y: 8.5, z: -8, s: 1.1 },
+                { x: 14, y: 9.2, z: -5, s: 0.9 },
+                { x: 8, y: 8.0, z: 12, s: 1.2 },
+                { x: -14, y: 8.8, z: 9, s: 1.0 }
+            ];
+            cloudCoords.forEach(c => {
+                const cg = new THREE.Group();
+                const p1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1 * c.s, 1), toyMat(0xFFFFFF));
+                const p2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.85 * c.s, 1), toyMat(0xFFFFFF));
+                p2.position.set(1.0 * c.s, -0.15, 0.2);
+                const p3 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 * c.s, 1), toyMat(0xFFFFFF));
+                p3.position.set(-0.95 * c.s, -0.2, -0.1);
+                cg.add(p1, p2, p3);
+                cg.position.set(c.x, c.y, c.z);
+                cloudsGroup.add(cg);
+            });
+            scene.add(cloudsGroup);
+
+            // Toy Sailboat orbiting the islands
+            boatsGroup = new THREE.Group();
+            const hull = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.45), toyMat(0xEF4444));
+            hull.position.set(16.5, -0.4, 0);
+            const sail = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 3), toyMat(0xFFFFFF));
+            sail.position.set(16.5, 0.2, 0);
+            boatsGroup.add(hull, sail);
+            scene.add(boatsGroup);
+        }
+
+        /********************************************************************
+         * 6. 3D FLOATING HTML PINS & CAMERA CONTROLS
+         ********************************************************************/
+        function createHTMLFloatingLabels() {
+            const container = document.getElementById('labels-container');
+            container.innerHTML = ISLANDS_DATA.map(island => `
+                <div id="label-island-${island.id}" onclick="selectIsland(${island.id}, true)"
+                    class="island-label absolute flex flex-col items-center select-none">
+                    <div id="label-pill-${island.id}" class="toy-badge px-2.5 py-1 rounded-full flex items-center gap-1.5 text-xs font-black transition-all bg-[#FFFDF7] text-[#023047]">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${island.themeColor}"></span>
+                        <span class="whitespace-nowrap">${island.shortName}</span>
+                    </div>
+                    <div class="w-0.5 h-2.5 bg-[#023047]"></div>
+                </div>
+            `).join('');
+            update3DLabelsActiveState();
+        }
+
+        function update3DLabelsActiveState() {
+            ISLANDS_DATA.forEach(island => {
+                const pill = document.getElementById(`label-pill-${island.id}`);
+                if (!pill) return;
+                if (island.id === currentIslandId) {
+                    pill.className = "toy-badge px-3 py-1 rounded-full flex items-center gap-1.5 text-xs sm:text-sm font-black bg-amber-400 text-[#023047] scale-110";
+                } else {
+                    pill.className = "toy-badge px-2.5 py-1 rounded-full flex items-center gap-1.5 text-[11px] sm:text-xs font-bold bg-[#FFFDF7]/95 text-[#023047] hover:bg-amber-100";
+                }
+            });
+
+            islandGroups.forEach(grp => {
+                if (grp.userData.ringMesh) {
+                    grp.userData.ringMesh.visible = (grp.userData.islandId === currentIslandId);
+                }
+            });
+        }
+
+        function updateHTMLFloatingLabelsPosition() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            ISLANDS_DATA.forEach(island => {
+                const el = document.getElementById(`label-island-${island.id}`);
+                if (!el) return;
+
+                const worldPos = new THREE.Vector3(island.pos.x, 4.3, island.pos.z);
+                worldPos.project(camera);
+
+                if (worldPos.z > 1) {
+                    el.style.display = 'none';
+                    return;
+                }
+
+                const x = (worldPos.x * 0.5 + 0.5) * width;
+                const y = (-(worldPos.y * 0.5) + 0.5) * height;
+
+                el.style.display = 'flex';
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+            });
+        }
+
+        function focusCameraOnIsland(id) {
+            const island = ISLANDS_DATA.find(i => i.id === id);
+            if (!island) return;
+
+            // Offset lookAt slightly on desktop so island centers in the left free space
+            const isDesktop = window.innerWidth >= 1024;
+            const offsetX = isDesktop ? 3.2 : 0;
+            const offsetZ = (!isDesktop && !isDrawerCollapsed) ? 2.5 : 0;
+
+            camState.targetLookAt.set(island.pos.x + offsetX, 0.8, island.pos.z + offsetZ);
+            camState.targetRadius = window.innerWidth < 768 ? 22 : 19;
+            camState.targetPhi = 0.92;
+        }
+
+        function resetCameraView() {
+            const isDesktop = window.innerWidth >= 1024;
+            camState.targetLookAt.set(isDesktop ? 4.0 : 0, 0, 0);
+            camState.targetRadius = window.innerWidth < 768 ? 35 : 29;
+            camState.targetPhi = 0.82;
+        }
+
+        // Special 3D Visual Effects Triggered by Mini-Apps
+        function trigger3DEarthquakeEffect() {
+            shakeTimer = 45;
+        }
+        function trigger3DVolcanoEffect() {
+            volcanoBurstTimer = 50;
+        }
+        function trigger3DTsunamiEffect() {
+            tsunamiWaveTimer = 60;
+        }
+
+        function setup3DInteractionListeners(canvas) {
+            // Mouse Events
+            canvas.addEventListener('mousedown', e => {
+                isDragging = true;
+                pointerMovedDistance = 0;
+                dragStart.x = e.clientX;
+                dragStart.y = e.clientY;
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (!isDragging) return;
+                const dx = e.clientX - dragStart.x;
+                const dy = e.clientY - dragStart.y;
+                pointerMovedDistance += Math.abs(dx) + Math.abs(dy);
+
+                camState.targetTheta -= dx * 0.007;
+                camState.targetPhi = Math.max(0.35, Math.min(1.38, camState.targetPhi - dy * 0.006));
+
+                dragStart.x = e.clientX;
+                dragStart.y = e.clientY;
+            });
+
+            window.addEventListener('mouseup', e => {
+                if (isDragging && pointerMovedDistance < 6) {
+                    handleCanvasTap(e.clientX, e.clientY);
+                }
+                isDragging = false;
+            });
+
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                camState.targetRadius = Math.max(12, Math.min(44, camState.targetRadius + e.deltaY * 0.02));
+            }, { passive: false });
+
+            // Touch Events for Mobile & Tablet
+            canvas.addEventListener('touchstart', e => {
+                if (e.touches.length === 1) {
+                    isDragging = true;
+                    pointerMovedDistance = 0;
+                    dragStart.x = e.touches[0].clientX;
+                    dragStart.y = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    isDragging = false;
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    pinchStartDist = Math.hypot(dx, dy);
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchmove', e => {
+                if (e.touches.length === 1 && isDragging) {
+                    const dx = e.touches[0].clientX - dragStart.x;
+                    const dy = e.touches[0].clientY - dragStart.y;
+                    pointerMovedDistance += Math.abs(dx) + Math.abs(dy);
+
+                    camState.targetTheta -= dx * 0.008;
+                    camState.targetPhi = Math.max(0.35, Math.min(1.38, camState.targetPhi - dy * 0.007));
+
+                    dragStart.x = e.touches[0].clientX;
+                    dragStart.y = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.hypot(dx, dy);
+                    const delta = pinchStartDist - dist;
+                    camState.targetRadius = Math.max(12, Math.min(44, camState.targetRadius + delta * 0.05));
+                    pinchStartDist = dist;
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchend', e => {
+                if (isDragging && pointerMovedDistance < 10 && e.changedTouches.length > 0) {
+                    handleCanvasTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                }
+                isDragging = false;
+            });
+        }
+
+        function handleCanvasTap(clientX, clientY) {
+            const container = document.getElementById('canvas-container');
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(selectableMeshes, false);
+            if (intersects.length > 0) {
+                const hitIslandId = intersects[0].object.userData.islandId;
+                if (hitIslandId) {
+                    selectIsland(hitIslandId, true);
+                }
+            }
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            if (!container || !renderer || !camera) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        /********************************************************************
+         * 7. MAIN ANIMATION LOOP
+         ********************************************************************/
+        let clockTick = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            clockTick += 1;
+
+            // Smooth Camera Interpolation
+            camState.theta += (camState.targetTheta - camState.theta) * 0.08;
+            camState.phi += (camState.targetPhi - camState.phi) * 0.08;
+            camState.radius += (camState.targetRadius - camState.radius) * 0.08;
+            camState.lookAt.lerp(camState.targetLookAt, 0.08);
+
+            const cx = camState.lookAt.x + camState.radius * Math.sin(camState.phi) * Math.sin(camState.theta);
+            const cy = camState.lookAt.y + camState.radius * Math.cos(camState.phi);
+            const cz = camState.lookAt.z + camState.radius * Math.sin(camState.phi) * Math.cos(camState.theta);
+
+            camera.position.set(cx, cy, cz);
+            camera.lookAt(camState.lookAt);
+
+            // Gentle Floating of Selected Island
+            islandGroups.forEach(grp => {
+                const isSelected = grp.userData.islandId === currentIslandId;
+                const targetY = isSelected ? Math.sin(clockTick * 0.05) * 0.18 + 0.25 : 0;
+                grp.position.y += (targetY - grp.position.y) * 0.1;
+
+                // Earthquake Shake Effect on Island 3
+                if (grp.userData.islandId === 3 && shakeTimer > 0) {
+                    grp.position.x = ISLANDS_DATA[2].pos.x + (Math.random() - 0.5) * 0.45;
+                    grp.position.z = ISLANDS_DATA[2].pos.z + (Math.random() - 0.5) * 0.45;
+                } else if (grp.userData.islandId === 3) {
+                    grp.position.x = ISLANDS_DATA[2].pos.x;
+                    grp.position.z = ISLANDS_DATA[2].pos.z;
+                }
+
+                // Volcano Smoke Burst on Island 4
+                if (grp.userData.islandId === 4 && grp.userData.smokeGroup) {
+                    if (volcanoBurstTimer > 0) {
+                        grp.userData.smokeGroup.scale.setScalar(1 + Math.sin(clockTick * 0.3) * 0.35 + 0.4);
+                    } else {
+                        grp.userData.smokeGroup.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+                    }
+                }
+            });
+
+            if (shakeTimer > 0) shakeTimer--;
+            if (volcanoBurstTimer > 0) volcanoBurstTimer--;
+            if (tsunamiWaveTimer > 0) tsunamiWaveTimer--;
+
+            // Animate Props
+            animatedProps.forEach(item => {
+                if (item.type === 'rotateY') {
+                    item.mesh.rotation.y += item.speed;
+                } else if (item.type === 'pulseScale') {
+                    const s = 1 + Math.sin(clockTick * item.speed) * 0.35;
+                    item.mesh.scale.set(s, s, 1);
+                } else if (item.type === 'bobY') {
+                    item.mesh.position.y = Math.sin(clockTick * item.speed) * 0.22;
+                } else if (item.type === 'waveSurge') {
+                    const amp = tsunamiWaveTimer > 0 ? 0.65 : 0.2;
+                    item.mesh.position.z = Math.sin(clockTick * item.speed) * amp;
+                    item.mesh.scale.y = tsunamiWaveTimer > 0 ? 1.35 : 1.0;
+                }
+            });
+
+            if (cloudsGroup) cloudsGroup.rotation.y += 0.0007;
+            if (boatsGroup) boatsGroup.rotation.y -= 0.0025;
+
+            renderer.render(scene, camera);
+            updateHTMLFloatingLabelsPosition();
+        }
+
+        // Start Application on Window Load
+        window.onload = function () {
+            init3DScene();
+            renderTopNavPills();
+            renderDrawerContent(1);
+            animate();
+        };
+    </script>
+</body>
+</html>
